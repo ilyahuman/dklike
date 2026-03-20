@@ -99,6 +99,13 @@ export class InputManager {
   }
 
   /**
+   * Check if a key is currently pressed.
+   * @param {string} code - Key code (e.g., 'KeyW').
+   * @returns {boolean}
+   */
+  isKeyDown(code) { return this._keysDown.has(code); }
+
+  /**
    * Called each update tick to handle continuous key-based panning.
    * @param {number} dt - Delta time in seconds.
    */

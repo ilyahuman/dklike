@@ -21,9 +21,12 @@ import { CombatSystem } from './systems/CombatSystem.js';
 import { CreatureSpawner } from './systems/CreatureSpawner.js';
 import { WaveManager } from './systems/WaveManager.js';
 import { FloatingText } from './rendering/FloatingText.js';
+import { SpellSystem } from './systems/SpellSystem.js';
+import { Door } from './entities/Door.js';
 import {
   COLORS, EVENTS, TILE_SIZE, TILE_TYPES, ROOM_TYPES,
   ROOM_CONFIG, RESOURCES, ENTITY_TYPES,
+  SPELL_TYPES, SPELL_CONFIG, DOOR_COST,
 } from './constants.js';
 
 // ── Canvas setup ─────────────────────────────────────
@@ -70,6 +73,9 @@ const combatSystem = new CombatSystem(entityManager, eventBus);
 const creatureSpawner = new CreatureSpawner(world, entityManager, eventBus, roomManager);
 const waveManager = new WaveManager(world, entityManager, eventBus, roomManager);
 const floatingText = new FloatingText(ctx, camera);
+
+// Phase 5 systems
+const spellSystem = new SpellSystem(world, entityManager, eventBus, resourceManager, roomManager, jobQueue);
 
 // ── Register Dungeon Heart room ──────────────────────
 const heartCx = Math.floor(world.width / 2);
@@ -163,8 +169,52 @@ eventBus.subscribe(EVENTS.INPUT_MOUSE_MOVE, (e) => {
 
 // Click handling
 eventBus.subscribe(EVENTS.INPUT_CLICK, (e) => {
+  // Possess mode: click = attack
+  if (spellSystem.isPossessing) {
+    spellSystem.possessedAttack();
+    return;
+  }
+
   // Minimap click first
   if (minimap.handleClick(e.screenX, e.screenY)) return;
+
+  // Spell: Create Imp
+  if (activeTool === 'spell:create_imp') {
+    spellSystem.castCreateImp();
+    return;
+  }
+
+  // Spell: Lightning Strike
+  if (activeTool === 'spell:lightning') {
+    spellSystem.castLightningStrike(e.worldX, e.worldY);
+    return;
+  }
+
+  // Spell: Possess Creature
+  if (activeTool === 'spell:possess') {
+    const entities = entityManager.getEntitiesInRadius(e.worldX, e.worldY, TILE_SIZE / 2);
+    const creature = entities.find(ent => ent.team === 'player' && ent.type !== ENTITY_TYPES.IMP && ent.type !== ENTITY_TYPES.DOOR);
+    if (creature) {
+      spellSystem.castPossess(creature.id);
+      camera.lockTo(creature);
+    }
+    return;
+  }
+
+  // Door placement
+  if (activeTool === 'door') {
+    if (Door.isValidDoorPlacement(world, e.tileX, e.tileY)) {
+      const existing = entityManager.getAll().find(ent =>
+        ent.type === ENTITY_TYPES.DOOR && ent.tileX === e.tileX && ent.tileY === e.tileY
+      );
+      if (!existing && resourceManager.spendGold(DOOR_COST)) {
+        const door = new Door(e.tileX, e.tileY, entityManager);
+        entityManager.add(door);
+        Pathfinder.clearCache();
+      }
+    }
+    return;
+  }
 
   const roomType = getRoomTypeFromTool(activeTool);
 
@@ -194,8 +244,15 @@ eventBus.subscribe(EVENTS.INPUT_CLICK, (e) => {
   }
 });
 
-// Key handling for room placement confirm/cancel
+// Key handling for room placement confirm/cancel + possess ESC
 eventBus.subscribe(EVENTS.INPUT_KEY_DOWN, (e) => {
+  // Possess mode: ESC exits
+  if (e.code === 'Escape' && spellSystem.isPossessing) {
+    spellSystem.unpossess();
+    camera.unlock();
+    return;
+  }
+
   const roomType = getRoomTypeFromTool(activeTool);
 
   if (e.code === 'Enter' && roomType && pendingRoomTiles.size > 0) {
@@ -291,12 +348,63 @@ eventBus.subscribe(EVENTS.ENTITY_SPAWNED, (e) => {
   particleSystem.burst(e.x, e.y, '#80ff80', 10, { speed: 60, life: 0.5, size: 2 });
 });
 
+// ── Phase 5 VFX ──────────────────────────────────────
+let screenShakeTimer = 0;
+let screenShakeMagnitude = 0;
+let lightningFlashTimer = 0;
+let possessDeathFlashTimer = 0;
+
+// Spell cast VFX
+eventBus.subscribe(EVENTS.SPELL_CAST, (e) => {
+  if (e.spell === SPELL_TYPES.LIGHTNING_STRIKE) {
+    screenShakeTimer = SPELL_CONFIG[SPELL_TYPES.LIGHTNING_STRIKE].shakeDuration;
+    screenShakeMagnitude = SPELL_CONFIG[SPELL_TYPES.LIGHTNING_STRIKE].shakeMagnitude;
+    lightningFlashTimer = 0.1;
+    particleSystem.burst(e.x, e.y, '#ffffff', 20, { speed: 120, life: 0.5, size: 3 });
+    particleSystem.burst(e.x, e.y, '#ffff80', 15, { speed: 80, life: 0.4, size: 2 });
+  }
+  if (e.spell === SPELL_TYPES.CREATE_IMP) {
+    particleSystem.burst(e.x, e.y, '#8060ff', 12, { speed: 40, life: 0.5, size: 3 });
+  }
+});
+
+// Possess death: camera shake + red flash
+eventBus.subscribe(EVENTS.POSSESS_END, (e) => {
+  if (e.reason === 'death') {
+    screenShakeTimer = 0.5;
+    screenShakeMagnitude = 6;
+    possessDeathFlashTimer = 0.5;
+  }
+  camera.unlock();
+});
+
+// Door debris on destruction
+eventBus.subscribe(EVENTS.ENTITY_DIED, (e) => {
+  if (e.type === ENTITY_TYPES.DOOR) {
+    particleSystem.burst(e.x, e.y, '#6a4a2a', 15, { speed: 80, life: 0.6, size: 3 });
+    particleSystem.burst(e.x, e.y, '#4a3a1a', 10, { speed: 60, life: 0.4, size: 2 });
+  }
+});
+
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 
 // ── Game loop ────────────────────────────────────────
 function update(dt) {
-  inputManager.update(dt);
+  // Possess mode: WASD moves creature, skip camera pan
+  if (spellSystem.isPossessing) {
+    let dx = 0, dy = 0;
+    if (inputManager.isKeyDown('KeyW') || inputManager.isKeyDown('ArrowUp')) dy = -1;
+    if (inputManager.isKeyDown('KeyS') || inputManager.isKeyDown('ArrowDown')) dy = 1;
+    if (inputManager.isKeyDown('KeyA') || inputManager.isKeyDown('ArrowLeft')) dx = -1;
+    if (inputManager.isKeyDown('KeyD') || inputManager.isKeyDown('ArrowRight')) dx = 1;
+    if (dx !== 0 || dy !== 0) {
+      spellSystem.movePossessed(dx, dy, dt);
+    }
+  } else {
+    inputManager.update(dt);
+  }
+
   entityManager.update(dt);
   particleSystem.update(dt);
   resourceManager.update(dt);
@@ -304,6 +412,7 @@ function update(dt) {
   creatureSpawner.update(dt);
   waveManager.update(dt);
   floatingText.update(dt);
+  spellSystem.update(dt);
 }
 
 let lastRenderTime = performance.now();
@@ -313,11 +422,27 @@ function render(alpha) {
   const renderDt = (now - lastRenderTime) / 1000;
   lastRenderTime = now;
 
+  // Camera lock tracking for possess mode
+  if (camera.isLocked) {
+    camera.updateLock();
+    camera.clampToWorld();
+  }
+
   const w = window.innerWidth;
   const h = window.innerHeight;
   ctx.clearRect(0, 0, w, h);
   ctx.fillStyle = COLORS.BG;
   ctx.fillRect(0, 0, w, h);
+
+  // Screen shake (apply before all rendering)
+  let shaking = screenShakeTimer > 0;
+  if (shaking) {
+    screenShakeTimer -= renderDt;
+    const shakeX = (Math.random() - 0.5) * screenShakeMagnitude * 2;
+    const shakeY = (Math.random() - 0.5) * screenShakeMagnitude * 2;
+    ctx.save();
+    ctx.translate(shakeX, shakeY);
+  }
 
   tileRenderer.render(alpha);
   entityRenderer.render(alpha);
@@ -364,6 +489,52 @@ function render(alpha) {
     }
   }
 
+  // Create Imp magic circle animation
+  const castAnim = spellSystem.getCastAnimState();
+  if (castAnim.timer > 0 && castAnim.position) {
+    const [cx, cy] = camera.worldToScreen(castAnim.position.x, castAnim.position.y);
+    const radius = TILE_SIZE * camera.zoom * 1.5;
+    const progress = 1 - (castAnim.timer / SPELL_CONFIG[SPELL_TYPES.CREATE_IMP].castTime);
+    ctx.save();
+    ctx.globalAlpha = 1 - progress;
+    ctx.strokeStyle = '#8060ff';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius * progress, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy, radius * 0.6 * progress, progress * Math.PI * 4, progress * Math.PI * 4 + Math.PI * 1.5);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  // Red cursor feedback for Lightning targeting friendlies
+  if (activeTool === 'spell:lightning' && hoverTileX >= 0 && hoverTileY >= 0) {
+    const hoverWX = hoverTileX * TILE_SIZE + TILE_SIZE / 2;
+    const hoverWY = hoverTileY * TILE_SIZE + TILE_SIZE / 2;
+    const nearbyEnts = entityManager.getEntitiesInRadius(hoverWX, hoverWY, TILE_SIZE);
+    const onlyFriendly = nearbyEnts.length > 0 && nearbyEnts.every(e => e.team === 'player');
+    if (onlyFriendly) {
+      const [hsx, hsy] = camera.worldToScreen(hoverTileX * TILE_SIZE, hoverTileY * TILE_SIZE);
+      const sz = TILE_SIZE * camera.zoom;
+      ctx.fillStyle = 'rgba(200, 40, 40, 0.3)';
+      ctx.fillRect(hsx, hsy, sz, sz);
+      ctx.strokeStyle = 'rgba(200, 40, 40, 0.6)';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(hsx + sz * 0.2, hsy + sz * 0.2);
+      ctx.lineTo(hsx + sz * 0.8, hsy + sz * 0.8);
+      ctx.moveTo(hsx + sz * 0.8, hsy + sz * 0.2);
+      ctx.lineTo(hsx + sz * 0.2, hsy + sz * 0.8);
+      ctx.stroke();
+    }
+  }
+
+  // End screen shake
+  if (shaking) {
+    ctx.restore();
+  }
+
   // HUD update (tween gold, imp count)
   hud.update(renderDt);
 
@@ -380,6 +551,20 @@ function render(alpha) {
     ctx.fillText('INTRUDERS!', w / 2, h / 2);
     ctx.globalAlpha = 1;
     ctx.textAlign = 'start';
+  }
+
+  // Lightning flash overlay (white)
+  if (lightningFlashTimer > 0) {
+    lightningFlashTimer -= renderDt;
+    ctx.fillStyle = `rgba(255, 255, 255, ${Math.min(1, lightningFlashTimer / 0.1) * 0.5})`;
+    ctx.fillRect(0, 0, w, h);
+  }
+
+  // Possess death flash overlay (red)
+  if (possessDeathFlashTimer > 0) {
+    possessDeathFlashTimer -= renderDt;
+    ctx.fillStyle = `rgba(255, 0, 0, ${Math.min(1, possessDeathFlashTimer / 0.5) * 0.4})`;
+    ctx.fillRect(0, 0, w, h);
   }
 
   // Update HUD wave timer
