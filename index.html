@@ -9,6 +9,33 @@
   <link href="https://fonts.googleapis.com/css2?family=MedievalSharp&family=Inter:wght@400;600&display=swap" rel="stylesheet">
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
+    /* ── Tooltip ───────────────────────────────────────── */
+    #tooltip {
+      position: fixed;
+      padding: 8px 12px;
+      background: rgba(30, 25, 20, 0.95);
+      border: 1px solid #6a5a45;
+      border-radius: 4px;
+      color: #c0b090;
+      font-family: 'Inter', sans-serif;
+      font-size: 12px;
+      pointer-events: none;
+      z-index: 300;
+      max-width: 200px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.8);
+      display: none;
+    }
+    .tt-title {
+      font-family: 'MedievalSharp', cursive;
+      font-size: 14px;
+      color: #e0d0a0;
+      margin-bottom: 4px;
+      text-transform: capitalize;
+    }
+    .tt-row {
+      font-size: 11px;
+      color: #a09080;
+    }
     body {
       background: #0a0a0a;
       overflow: hidden;
@@ -101,6 +128,68 @@
     .hud-mana-val { color: #4080f0; font-size: 12px; }
     .hud-imp-val { color: #c0b090; }
     .hud-wave-val { color: #c06040; }
+    /* ── Toolbar ───────────────────────────────────────── */
+    #toolbar {
+      position: fixed;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: stretch;
+      gap: 4px;
+      padding: 6px 12px;
+      background: linear-gradient(0deg, #3a352e 0%, #2a2520 100%);
+      border-top: 2px solid #5a4a35;
+      border-radius: 8px 8px 0 0;
+      box-shadow: 0 -2px 8px rgba(0,0,0,0.6);
+      z-index: 200;
+      pointer-events: auto;
+    }
+    .tool-btn {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 8px;
+      background: linear-gradient(180deg, #4a4238 0%, #3a3228 100%);
+      border: 1px solid #6a5a45;
+      border-radius: 4px;
+      color: #c0b090;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      min-width: 56px;
+      transition: background 0.15s;
+      user-select: none;
+    }
+    .tool-btn:hover:not(.disabled) {
+      background: linear-gradient(180deg, #5a5248 0%, #4a4238 100%);
+    }
+    .tool-btn.active {
+      background: linear-gradient(180deg, #6a5a3a 0%, #5a4a2a 100%);
+      border-color: #c0a060;
+      color: #f0d080;
+    }
+    .tool-btn.disabled {
+      opacity: 0.35;
+      cursor: not-allowed;
+    }
+    .tool-name { font-weight: 600; font-size: 11px; }
+    .tool-cost { font-size: 9px; color: #908070; }
+    .tool-hotkey {
+      font-size: 9px;
+      color: #706050;
+      margin-top: 2px;
+    }
+    .toolbar-divider {
+      width: 1px;
+      background: #5a4a35;
+      margin: 0 4px;
+    }
+    #speed-toggle {
+      font-family: 'MedievalSharp', cursive;
+      font-size: 14px;
+    }
   </style>
 </head>
 <body>
