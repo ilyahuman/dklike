@@ -1,5 +1,6 @@
 import { EventBus } from './core/EventBus.js';
 import { GameLoop } from './core/GameLoop.js';
+import { GameStateManager, GAME_STATES } from './core/GameStateManager.js';
 import { World } from './world/World.js';
 import { MapGenerator } from './world/MapGenerator.js';
 import { Pathfinder } from './world/Pathfinder.js';
@@ -17,6 +18,7 @@ import { Imp } from './entities/Imp.js';
 import { HUD } from './ui/HUD.js';
 import { Toolbar } from './ui/Toolbar.js';
 import { Tooltip } from './ui/Tooltip.js';
+import { MenuScreen } from './ui/MenuScreen.js';
 import { CombatSystem } from './systems/CombatSystem.js';
 import { CreatureSpawner } from './systems/CreatureSpawner.js';
 import { WaveManager } from './systems/WaveManager.js';
@@ -27,6 +29,7 @@ import {
   COLORS, EVENTS, TILE_SIZE, TILE_TYPES, ROOM_TYPES,
   ROOM_CONFIG, RESOURCES, ENTITY_TYPES,
   SPELL_TYPES, SPELL_CONFIG, DOOR_COST,
+  WIN_GOLD_THRESHOLD, WIN_WAVE_THRESHOLD, DUNGEON_HEART_HP,
 } from './constants.js';
 
 // ── Canvas setup ─────────────────────────────────────
@@ -76,6 +79,10 @@ const floatingText = new FloatingText(ctx, camera);
 
 // Phase 5 systems
 const spellSystem = new SpellSystem(world, entityManager, eventBus, resourceManager, roomManager, jobQueue);
+
+// Phase 6 systems
+const gameStateManager = new GameStateManager(eventBus);
+const menuScreen = new MenuScreen(hudOverlay, eventBus);
 
 // ── Register Dungeon Heart room ──────────────────────
 const heartCx = Math.floor(world.width / 2);
@@ -246,6 +253,21 @@ eventBus.subscribe(EVENTS.INPUT_CLICK, (e) => {
 
 // Key handling for room placement confirm/cancel + possess ESC
 eventBus.subscribe(EVENTS.INPUT_KEY_DOWN, (e) => {
+  // Pause toggle (P key or Escape, only when NOT possessing)
+  if (!spellSystem.isPossessing && (e.code === 'KeyP' || e.code === 'Escape')) {
+    if (gameStateManager.state === 'playing') {
+      gameStateManager.pause();
+      gameLoop.pause();
+      menuScreen.showPause();
+      return;
+    } else if (gameStateManager.state === 'paused') {
+      gameStateManager.resume();
+      gameLoop.resume();
+      menuScreen.hidePause();
+      return;
+    }
+  }
+
   // Possess mode: ESC exits
   if (e.code === 'Escape' && spellSystem.isPossessing) {
     spellSystem.unpossess();
@@ -353,6 +375,30 @@ let screenShakeTimer = 0;
 let screenShakeMagnitude = 0;
 let lightningFlashTimer = 0;
 let possessDeathFlashTimer = 0;
+let gameOverFlashTimer = 0;
+
+// ── Menu events ───────────────────────────────────────
+eventBus.subscribe('menu:start', () => {
+  gameStateManager.startGame();
+  menuScreen.hideAll();
+  gameLoop.resume();
+});
+
+eventBus.subscribe('menu:resume', () => {
+  gameStateManager.resume();
+  menuScreen.hidePause();
+  gameLoop.resume();
+});
+
+eventBus.subscribe('menu:restart', () => {
+  // Full restart — reload page for clean state (simplest way to guarantee no ghost state)
+  window.location.reload();
+});
+
+eventBus.subscribe('menu:quit', () => {
+  // Quit returns to main menu — also reload for clean state
+  window.location.reload();
+});
 
 // Spell cast VFX
 eventBus.subscribe(EVENTS.SPELL_CAST, (e) => {
@@ -386,6 +432,55 @@ eventBus.subscribe(EVENTS.ENTITY_DIED, (e) => {
   }
 });
 
+// Game over / victory screens
+eventBus.subscribe(EVENTS.GAME_OVER, (e) => {
+  // Dramatic effects: screen shake + red flash
+  screenShakeTimer = 1.0;
+  screenShakeMagnitude = 6;
+  gameOverFlashTimer = 1.0; // 1s red flash overlay
+  // After 1 second of slow-motion, fully pause and show screen
+  setTimeout(() => {
+    gameLoop.pause();
+    gameLoop.setSpeed(1); // Reset speed for when they restart
+    menuScreen.showGameOver(e.stats);
+  }, 1000);
+});
+
+eventBus.subscribe(EVENTS.GAME_VICTORY, (e) => {
+  gameLoop.pause();
+  menuScreen.showVictory(e.stats);
+});
+
+// Track stats for game session
+eventBus.subscribe(EVENTS.ENTITY_DIED, (e) => {
+  if (e.team === 'enemy') {
+    gameStateManager.addStat('heroesKilled', 1);
+  }
+  if (e.team === 'player' && e.type !== ENTITY_TYPES.DOOR) {
+    gameStateManager.addStat('creaturesLost', 1);
+  }
+});
+
+// Track gold earned via RESOURCES_CHANGED delta
+let lastGold = 0;
+eventBus.subscribe(EVENTS.RESOURCES_CHANGED, (data) => {
+  if (data.gold > lastGold) {
+    gameStateManager.addStat('goldEarned', data.gold - lastGold);
+  }
+  lastGold = data.gold;
+});
+
+// Track waves survived + check win condition on wave completion
+eventBus.subscribe(EVENTS.WAVE_COMPLETED, (e) => {
+  gameStateManager.addStat('wavesSurvived', 1);
+  // Win condition: survived 10 waves AND have 5000+ gold
+  if (gameStateManager.getStat('wavesSurvived') >= WIN_WAVE_THRESHOLD
+      && resourceManager.gold >= WIN_GOLD_THRESHOLD
+      && gameStateManager.state === 'playing') {
+    gameStateManager.victory();
+  }
+});
+
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 
@@ -413,6 +508,27 @@ function update(dt) {
   waveManager.update(dt);
   floatingText.update(dt);
   spellSystem.update(dt);
+
+  // Check if any hero has reached the Dungeon Heart
+  const heartCenterX = heartCx * TILE_SIZE + TILE_SIZE / 2;
+  const heartCenterY = heartCy * TILE_SIZE + TILE_SIZE / 2;
+  const heroesAtHeart = entityManager.getEntitiesInRadius(heartCenterX, heartCenterY, TILE_SIZE * 2);
+  for (const hero of heroesAtHeart) {
+    if (hero.team === 'enemy' && hero.alive) {
+      resourceManager.damageHeart(hero.damage * dt);
+    }
+  }
+
+  // Track elapsed time
+  gameStateManager.updateTime(dt);
+
+  // Lose condition: Dungeon Heart destroyed
+  if (resourceManager.isHeartDestroyed && gameStateManager.state === 'playing') {
+    gameStateManager.gameOver();
+    // Slow-motion for 1 second, then pause (see GAME_OVER event handler)
+    gameLoop.setSpeed(0.2);
+    return;
+  }
 }
 
 let lastRenderTime = performance.now();
@@ -567,6 +683,13 @@ function render(alpha) {
     ctx.fillRect(0, 0, w, h);
   }
 
+  // Game over red flash overlay
+  if (gameOverFlashTimer > 0) {
+    gameOverFlashTimer -= renderDt;
+    ctx.fillStyle = `rgba(200, 0, 0, ${Math.min(1, gameOverFlashTimer) * 0.5})`;
+    ctx.fillRect(0, 0, w, h);
+  }
+
   // Update HUD wave timer
   hud.setWaveTimer(`${waveManager.countdown}s`);
 
@@ -575,3 +698,5 @@ function render(alpha) {
 
 const gameLoop = new GameLoop(update, render);
 gameLoop.start();
+gameLoop.pause(); // Start paused at menu
+menuScreen.showMenu();

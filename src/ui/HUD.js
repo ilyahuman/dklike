@@ -43,6 +43,13 @@ export class HUD {
         <span class="hud-label">Wave</span>
         <span class="hud-wave-val" id="hud-wave-timer">---</span>
       </div>
+      <div class="hud-item">
+        <span class="hud-label">Heart</span>
+        <div class="mana-bar-bg" style="border-color:#c04040;">
+          <div class="mana-bar-fill" id="hud-heart-fill" style="background:linear-gradient(90deg,#a02020,#c04040);"></div>
+        </div>
+        <span id="hud-heart-text" style="color:#c04040;font-size:12px;">500</span>
+      </div>
     `;
     container.appendChild(this._el);
 
@@ -74,6 +81,8 @@ export class HUD {
     this._manaText = this._el.querySelector('#hud-mana-text');
     this._impCountEl = this._el.querySelector('#hud-imp-count');
     this._waveTimerEl = this._el.querySelector('#hud-wave-timer');
+    this._heartFill = this._el.querySelector('#hud-heart-fill');
+    this._heartText = this._el.querySelector('#hud-heart-text');
   }
 
   /** @private */
@@ -83,6 +92,11 @@ export class HUD {
       const manaPercent = (data.mana / data.manaCap) * 100;
       this._manaFill.style.width = `${manaPercent}%`;
       this._manaText.textContent = `${Math.floor(data.mana)}/${data.manaCap}`;
+      if (data.heartHP !== undefined) {
+        const heartPercent = (data.heartHP / data.heartMaxHP) * 100;
+        this._heartFill.style.width = `${heartPercent}%`;
+        this._heartText.textContent = `${Math.floor(data.heartHP)}`;
+      }
     });
 
     this._eventBus.subscribe(EVENTS.POSSESS_START, (data) => {
