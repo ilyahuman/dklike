@@ -1,4 +1,4 @@
-import { EVENTS, CAMERA } from '../constants.js';
+import { EVENTS, CAMERA, TILE_SIZE } from '../constants.js';
 
 /**
  * Captures all mouse and keyboard input, converts to world-space
@@ -30,7 +30,7 @@ export class InputManager {
       this._eventBus.publish(EVENTS.INPUT_CLICK, {
         screenX: e.clientX, screenY: e.clientY,
         worldX: wx, worldY: wy,
-        tileX: Math.floor(wx / 32), tileY: Math.floor(wy / 32),
+        tileX: Math.floor(wx / TILE_SIZE), tileY: Math.floor(wy / TILE_SIZE),
       });
     });
 
@@ -40,7 +40,7 @@ export class InputManager {
       this._eventBus.publish(EVENTS.INPUT_RIGHT_CLICK, {
         screenX: e.clientX, screenY: e.clientY,
         worldX: wx, worldY: wy,
-        tileX: Math.floor(wx / 32), tileY: Math.floor(wy / 32),
+        tileX: Math.floor(wx / TILE_SIZE), tileY: Math.floor(wy / TILE_SIZE),
       });
     });
 
@@ -59,7 +59,7 @@ export class InputManager {
       this._eventBus.publish(EVENTS.INPUT_MOUSE_MOVE, {
         screenX: e.clientX, screenY: e.clientY,
         worldX: wx, worldY: wy,
-        tileX: Math.floor(wx / 32), tileY: Math.floor(wy / 32),
+        tileX: Math.floor(wx / TILE_SIZE), tileY: Math.floor(wy / TILE_SIZE),
       });
     });
 
