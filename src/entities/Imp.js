@@ -1,6 +1,6 @@
 import { Entity } from './Entity.js';
 import { Pathfinder } from '../world/Pathfinder.js';
-import { ENTITY_TYPES, CREATURE_STATES, IMP_STATS, TILE_SIZE, TILE_TYPES, EVENTS } from '../constants.js';
+import { ENTITY_TYPES, CREATURE_STATES, IMP_STATS, TILE_SIZE, TILE_TYPES, EVENTS, ROOM_TYPES, RESOURCES } from '../constants.js';
 
 /**
  * Imp worker creature with autonomous AI.
@@ -15,8 +15,9 @@ export class Imp extends Entity {
    * @param {import('../world/World.js').World} world
    * @param {import('../core/EventBus.js').EventBus} eventBus
    * @param {import('../systems/JobQueue.js').JobQueue} jobQueue
+   * @param {import('../systems/RoomManager.js').RoomManager|null} [roomManager=null]
    */
-  constructor(x, y, world, eventBus, jobQueue) {
+  constructor(x, y, world, eventBus, jobQueue, roomManager = null) {
     super(ENTITY_TYPES.IMP, x, y);
     this.health = IMP_STATS.hp;
     this.maxHealth = IMP_STATS.hp;
@@ -28,6 +29,7 @@ export class Imp extends Entity {
     this._world = world;
     this._eventBus = eventBus;
     this._jobQueue = jobQueue;
+    this._roomManager = roomManager;
 
     /** @type {Array<{x:number,y:number}>|null} */
     this._path = null;
@@ -39,6 +41,12 @@ export class Imp extends Entity {
     this._facingRight = true;
     this._eatTimer = 0;
     this._sleepTimer = 0;
+    /** @type {'dig'|'eat'|'sleep'|'wander'|null} */
+    this._moveGoal = null;
+    /** @type {boolean} True when continuously mining a gem seam. */
+    this._miningGemSeam = false;
+    /** @type {number} Accumulator for gem seam gold ticks. */
+    this._mineAccumulator = 0;
   }
 
   /**
@@ -89,6 +97,7 @@ export class Imp extends Entity {
           this._jobQueue.releaseJob(this.id);
           this._currentJob = null;
         } else {
+          this._moveGoal = 'dig';
           return;
         }
       }
@@ -96,6 +105,7 @@ export class Imp extends Entity {
 
     // No work -- wander
     this.state = CREATURE_STATES.IDLE;
+    this._moveGoal = null;
   }
 
   /** @private */
@@ -106,6 +116,7 @@ export class Imp extends Entity {
     if (this._currentJob) {
       this._jobQueue.releaseJob(this.id);
       this._currentJob = null;
+      this._miningGemSeam = false;
     }
     // Path toward center of map (dungeon heart area)
     const cx = Math.floor(this._world.width / 2);
@@ -123,17 +134,36 @@ export class Imp extends Entity {
     this._followPath(dt);
   }
 
-  /** @private -- Enter EATING state. In Phase 2, eats "in place" (Hatchery rooms come in Phase 3). */
+  /** @private */
   _enterEat() {
     if (this.state === CREATURE_STATES.EATING) return;
-    // Release any current job
     if (this._currentJob) {
       this._jobQueue.releaseJob(this.id);
       this._currentJob = null;
+      this._miningGemSeam = false;
     }
+
+    // Try to find a Hatchery room tile
+    if (this._roomManager) {
+      const tiles = this._roomManager.getRoomTilesOfType(ROOM_TYPES.HATCHERY);
+      if (tiles.length > 0) {
+        const target = this._findNearestRoomTile(tiles);
+        if (target) {
+          this._pathToTile(target.x, target.y);
+          if (this._path) {
+            this._moveGoal = 'eat';
+            this.state = CREATURE_STATES.MOVING;
+            return;
+          }
+        }
+      }
+    }
+
+    // Fallback: eat in place
     this.state = CREATURE_STATES.EATING;
     this._eatTimer = 0;
     this._path = null;
+    this._moveGoal = null;
   }
 
   /** @private */
@@ -146,17 +176,36 @@ export class Imp extends Entity {
     }
   }
 
-  /** @private -- Enter SLEEPING state. In Phase 2, sleeps "in place" (Lair rooms come in Phase 3). */
+  /** @private */
   _enterSleep() {
     if (this.state === CREATURE_STATES.SLEEPING) return;
-    // Release any current job
     if (this._currentJob) {
       this._jobQueue.releaseJob(this.id);
       this._currentJob = null;
+      this._miningGemSeam = false;
     }
+
+    // Try to find a Lair room tile
+    if (this._roomManager) {
+      const tiles = this._roomManager.getRoomTilesOfType(ROOM_TYPES.LAIR);
+      if (tiles.length > 0) {
+        const target = this._findNearestRoomTile(tiles);
+        if (target) {
+          this._pathToTile(target.x, target.y);
+          if (this._path) {
+            this._moveGoal = 'sleep';
+            this.state = CREATURE_STATES.MOVING;
+            return;
+          }
+        }
+      }
+    }
+
+    // Fallback: sleep in place
     this.state = CREATURE_STATES.SLEEPING;
     this._sleepTimer = 0;
     this._path = null;
+    this._moveGoal = null;
   }
 
   /** @private */
@@ -172,27 +221,39 @@ export class Imp extends Entity {
   /** @private */
   _updateMove(dt) {
     if (!this._path || this._pathIndex >= this._path.length) {
-      // Arrived at destination
+      // Arrived at destination — check moveGoal
+      if (this._moveGoal === 'eat') {
+        this.state = CREATURE_STATES.EATING;
+        this._eatTimer = 0;
+        this._moveGoal = null;
+        return;
+      }
+      if (this._moveGoal === 'sleep') {
+        this.state = CREATURE_STATES.SLEEPING;
+        this._sleepTimer = 0;
+        this._moveGoal = null;
+        return;
+      }
       if (this._currentJob) {
-        // Check if adjacent to dig target
         const { tx, ty } = this.getTile(TILE_SIZE);
         const job = this._currentJob;
         const dist = Math.abs(tx - job.x) + Math.abs(ty - job.y);
         if (dist <= 1) {
           this.state = CREATURE_STATES.DIGGING;
           this._digProgress = 0;
+          this._moveGoal = null;
           return;
         }
-        // Try to pathfind closer
         this._pathToAdjacentWalkable(job.x, job.y);
         if (!this._path) {
-          // Can't reach -- release job
           this._jobQueue.releaseJob(this.id);
           this._currentJob = null;
           this.state = CREATURE_STATES.IDLE;
+          this._moveGoal = null;
         }
       } else {
         this.state = CREATURE_STATES.IDLE;
+        this._moveGoal = null;
       }
       return;
     }
@@ -203,25 +264,39 @@ export class Imp extends Entity {
   _updateDig(dt) {
     if (!this._currentJob) {
       this.state = CREATURE_STATES.IDLE;
+      this._miningGemSeam = false;
       return;
     }
+    const { x, y } = this._currentJob;
+    const tileType = this._world.getTile(x, y);
+
+    // Continuous gem seam mining mode
+    if (this._miningGemSeam) {
+      this._mineAccumulator += dt;
+      if (this._mineAccumulator >= 1.0) {
+        this._mineAccumulator -= 1.0;
+        this._eventBus.publish(EVENTS.TILE_DUG, {
+          x, y, tileType, goldAmount: RESOURCES.GEM_SEAM_GOLD_PER_SEC,
+        });
+      }
+      return;
+    }
+
     this._digProgress += dt;
     if (this._digProgress >= IMP_STATS.digTime) {
-      // Complete dig
-      const { x, y } = this._currentJob;
-      const tileType = this._world.getTile(x, y);
-
-      // Convert tile to unclaimed floor
+      if (tileType === TILE_TYPES.GEM_SEAM) {
+        // Gem seam: don't consume tile, enter continuous mining
+        this._miningGemSeam = true;
+        this._mineAccumulator = 0;
+        this._eventBus.publish(EVENTS.TILE_DUG, { x, y, tileType });
+        Pathfinder.clearCache();
+        return;
+      }
+      // Normal dig: convert to floor
       this._world.setTile(x, y, TILE_TYPES.UNCLAIMED_FLOOR);
-
-      // Claim adjacent floor tiles
       this._claimAdjacentFloor(x, y);
-
-      // Emit events
       this._eventBus.publish(EVENTS.TILE_DUG, { x, y, tileType });
       Pathfinder.clearCache();
-
-      // Complete job
       this._jobQueue.completeDigJob(x, y);
       this._currentJob = null;
       this._digProgress = 0;
@@ -296,6 +371,24 @@ export class Imp extends Entity {
       }
     }
     this._path = null;
+  }
+
+  /**
+   * Find the nearest room tile by Manhattan distance.
+   * @private
+   */
+  _findNearestRoomTile(tiles) {
+    const { tx, ty } = this.getTile(TILE_SIZE);
+    let best = null;
+    let bestDist = Infinity;
+    for (const t of tiles) {
+      const dist = Math.abs(t.x - tx) + Math.abs(t.y - ty);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = t;
+      }
+    }
+    return best;
   }
 
   /** @private */
