@@ -26,7 +26,7 @@ export class EntityRenderer {
     this._animTime += 0.016; // Approximate frame time for animation
     const ctx = this._ctx;
 
-    for (const entity of this._entityManager.getAll()) {
+    for (const entity of this._entityManager) {
       // Interpolate position
       const x = entity.prevX + (entity.x - entity.prevX) * alpha;
       const y = entity.prevY + (entity.y - entity.prevY) * alpha;

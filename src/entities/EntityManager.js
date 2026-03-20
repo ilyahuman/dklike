@@ -45,6 +45,14 @@ export class EntityManager {
   }
 
   /**
+   * Iterate all entities without allocating an array.
+   * @returns {Iterator<import('./Entity.js').Entity>}
+   */
+  [Symbol.iterator]() {
+    return this._entities.values();
+  }
+
+  /**
    * Get all entities of a specific type.
    * @param {string} type
    * @returns {import('./Entity.js').Entity[]}
