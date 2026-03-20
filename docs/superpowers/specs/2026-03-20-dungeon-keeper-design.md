@@ -133,6 +133,7 @@ render(accumulator / timestep)  // interpolation alpha
 
 ### Map Generation (Seeded)
 
+- Map dimensions: 80×60 tiles (TILE_SIZE: 32px)
 - Solid rock border (impassable)
 - Interior: mostly diggable dirt
 - Center: pre-cleared 3×3 Dungeon Heart room (claimed floor)
@@ -148,8 +149,8 @@ render(accumulator / timestep)  // interpolation alpha
 | DIRT | No | Yes | Main dig target |
 | UNCLAIMED_FLOOR | Yes | No | Freshly dug, unowned |
 | CLAIMED_FLOOR | Yes | No | Player territory |
-| GOLD_VEIN | No | Yes | Yields gold when dug |
-| GEM_SEAM | No | Yes | Yields gems/gold, infinite |
+| GOLD_VEIN | No | Yes | Yields 200 gold when dug, tile consumed (becomes floor) |
+| GEM_SEAM | No | Yes | Yields gold when mined, never consumed (infinite source). Imp mines continuously, +5 gold/sec. |
 | LAVA | No | No | Hazard, animated shimmer |
 | WATER | No | No | Hazard, animated ripple |
 
@@ -188,7 +189,7 @@ render(accumulator / timestep)  // interpolation alpha
 - HP: 80, fast speed, whip (hits 2 targets), applies slow debuff
 - States: same as Troll + TRAINING
 
-**Creature spawning:** Check room conditions every 30s. If met and count < cap, spawn near qualifying room with "creature attracted" floating text + particle burst.
+**Creature spawning:** Check room conditions every 30s. If met and count < cap (max 3 Trolls, max 3 Dark Mistresses), spawn near qualifying room with "creature attracted" floating text + particle burst.
 
 **Leveling:** XP gained at 1/sec in Training Room. Thresholds: 100/250/500/900 for levels 2/3/4/5. Per level: +10% HP, +10% damage, +5% speed. Level badge on sprite.
 
@@ -196,9 +197,9 @@ render(accumulator / timestep)  // interpolation alpha
 
 | Hero | HP | Speed | Behavior |
 |------|-----|-------|----------|
-| Knight | 150 | Slow | Melee. Attacks doors and creatures on path to Dungeon Heart. |
-| Thief | 60 | Fast | Bypasses creatures if possible, targets Treasury first. |
-| Wizard | 80 | Medium | Ranged (3-tile). Kites melee attackers. |
+| Knight | 150 | Slow | Melee. Attacks doors and creatures on path to Dungeon Heart. Drops 50 gold. |
+| Thief | 60 | Fast | Bypasses creatures if possible, targets Treasury first. Drops 30 gold. |
+| Wizard | 80 | Medium | Ranged (3-tile). Kites melee attackers. Drops 75 gold. |
 
 **Wave system:** Waves every 90 seconds from random map-edge entry. Wave N: N Knights + ceil(N×0.5) Thieves + ceil(N×0.3) Wizards. Screen flash + "INTRUDERS" overlay on arrival. Heroes pathfind to Dungeon Heart via A*, re-path every 3s or when blocked.
 
@@ -225,7 +226,7 @@ Tick-based at 200ms intervals. Each attacker finds nearest enemy in range, deals
 ### Resources
 
 - **Gold:** Earned from digging gold veins and killing heroes. Base cap 1000 + 500 per Treasury tile. Overflow lost (HUD warning flash).
-- **Mana:** Float. Regenerates at +2/sec from Dungeon Heart. Spent on spells.
+- **Mana:** Float. Regenerates at +2/sec from Dungeon Heart. Cap: 500. Spent on spells.
 
 ---
 
