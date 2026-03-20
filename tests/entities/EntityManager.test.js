@@ -62,6 +62,7 @@ describe('EntityManager', () => {
     em.add(e1);
     em.add(e2);
     em.add(e3);
+    em.rebuildSpatialHash();
     const nearby = em.getEntitiesInRadius(100, 100, 50);
     expect(nearby.length).toBe(2);
     expect(nearby).toContain(e1);
@@ -76,5 +77,34 @@ describe('EntityManager', () => {
     em.update(0.016);
     expect(e.prevX).toBe(100);
     expect(e.prevY).toBe(200);
+  });
+});
+
+describe('spatial hash - getEntitiesInRadius', () => {
+  it('should find entities within radius', () => {
+    const em = new EntityManager();
+    const e1 = { id: 1, x: 100, y: 100, prevX: 100, prevY: 100, alive: true, update: vi.fn() };
+    const e2 = { id: 2, x: 500, y: 500, prevX: 500, prevY: 500, alive: true, update: vi.fn() };
+    em.add(e1);
+    em.add(e2);
+    em.rebuildSpatialHash();
+    const nearby = em.getEntitiesInRadius(100, 100, 50);
+    expect(nearby).toContain(e1);
+    expect(nearby).not.toContain(e2);
+  });
+
+  it('should return empty array when no entities nearby', () => {
+    const em = new EntityManager();
+    em.rebuildSpatialHash();
+    expect(em.getEntitiesInRadius(100, 100, 50)).toEqual([]);
+  });
+
+  it('should handle entities at cell boundaries', () => {
+    const em = new EntityManager();
+    const e1 = { id: 1, x: 128, y: 128, prevX: 128, prevY: 128, alive: true, update: vi.fn() };
+    em.add(e1);
+    em.rebuildSpatialHash();
+    const nearby = em.getEntitiesInRadius(130, 130, 50);
+    expect(nearby).toContain(e1);
   });
 });
