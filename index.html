@@ -45,6 +45,62 @@
     #hud-overlay > * {
       pointer-events: auto;
     }
+    /* ── HUD ───────────────────────────────────────────── */
+    #hud-bar {
+      position: fixed;
+      top: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      padding: 8px 28px;
+      background: linear-gradient(180deg, #3a352e 0%, #2a2520 100%);
+      border-bottom: 2px solid #5a4a35;
+      border-radius: 0 0 8px 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.6);
+      font-family: 'MedievalSharp', cursive;
+      font-size: 16px;
+      color: #c0b090;
+      z-index: 200;
+      pointer-events: auto;
+    }
+    .hud-item {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .hud-label {
+      font-size: 12px;
+      color: #908070;
+      font-family: 'Inter', sans-serif;
+    }
+    .gold-icon {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      background: radial-gradient(circle at 40% 35%, #f0d060, #b89020);
+      border-radius: 50%;
+      border: 1px solid #806020;
+    }
+    .hud-gold-val { color: #f0c040; }
+    .mana-bar-bg {
+      width: 80px;
+      height: 12px;
+      background: #1a1825;
+      border: 1px solid #4060a0;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .mana-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #3060c0, #4080f0);
+      transition: width 0.3s ease;
+      width: 0%;
+    }
+    .hud-mana-val { color: #4080f0; font-size: 12px; }
+    .hud-imp-val { color: #c0b090; }
+    .hud-wave-val { color: #c06040; }
   </style>
 </head>
 <body>
