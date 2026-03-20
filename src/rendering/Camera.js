@@ -16,6 +16,9 @@ export class Camera {
     // Start centered on the map
     this.x = (MAP_WIDTH * TILE_SIZE) / 2;
     this.y = (MAP_HEIGHT * TILE_SIZE) / 2;
+    this._lockedEntity = null;
+    this._savedX = 0;
+    this._savedY = 0;
   }
 
   /**
@@ -95,5 +98,39 @@ export class Camera {
   resize(w, h) {
     this.viewportWidth = w;
     this.viewportHeight = h;
+  }
+
+  /** @type {boolean} */
+  get isLocked() { return this._lockedEntity !== null; }
+
+  /**
+   * Lock camera to an entity. Saves current position for restore.
+   * @param {{x: number, y: number}} entity
+   */
+  lockTo(entity) {
+    if (!this._lockedEntity) {
+      this._savedX = this.x;
+      this._savedY = this.y;
+    }
+    this._lockedEntity = entity;
+    this.x = entity.x;
+    this.y = entity.y;
+  }
+
+  /** Update position to track locked entity. */
+  updateLock() {
+    if (this._lockedEntity) {
+      this.x = this._lockedEntity.x;
+      this.y = this._lockedEntity.y;
+    }
+  }
+
+  /** Unlock camera and restore saved position. */
+  unlock() {
+    if (this._lockedEntity) {
+      this.x = this._savedX;
+      this.y = this._savedY;
+      this._lockedEntity = null;
+    }
   }
 }

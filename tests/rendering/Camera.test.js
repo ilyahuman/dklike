@@ -61,3 +61,36 @@ describe('Camera', () => {
     expect(bounds.endY).toBeGreaterThan(bounds.startY);
   });
 });
+
+describe('Camera lock/unlock', () => {
+  it('lockTo should save position and center on entity', () => {
+    const cam = new Camera(800, 600);
+    const entity = { x: 200, y: 300 };
+    cam.lockTo(entity);
+    expect(cam.isLocked).toBe(true);
+    expect(cam.x).toBe(200);
+    expect(cam.y).toBe(300);
+  });
+
+  it('updateLock should track entity position', () => {
+    const cam = new Camera(800, 600);
+    const entity = { x: 200, y: 300 };
+    cam.lockTo(entity);
+    entity.x = 500;
+    entity.y = 400;
+    cam.updateLock();
+    expect(cam.x).toBe(500);
+    expect(cam.y).toBe(400);
+  });
+
+  it('unlock should restore saved position', () => {
+    const cam = new Camera(800, 600);
+    const prevX = cam.x;
+    const prevY = cam.y;
+    cam.lockTo({ x: 200, y: 300 });
+    cam.unlock();
+    expect(cam.isLocked).toBe(false);
+    expect(cam.x).toBe(prevX);
+    expect(cam.y).toBe(prevY);
+  });
+});
