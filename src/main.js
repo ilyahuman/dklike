@@ -1,27 +1,51 @@
 import { EventBus } from './core/EventBus.js';
 import { GameLoop } from './core/GameLoop.js';
-import { COLORS } from './constants.js';
+import { World } from './world/World.js';
+import { MapGenerator } from './world/MapGenerator.js';
+import { Camera } from './rendering/Camera.js';
+import { TileRenderer } from './rendering/TileRenderer.js';
+import { Minimap } from './rendering/Minimap.js';
+import { InputManager } from './input/InputManager.js';
+import { COLORS, EVENTS } from './constants.js';
 
+// ── Canvas setup ─────────────────────────────────────
 /** @type {HTMLCanvasElement} */
 const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
 const fpsEl = document.getElementById('fps-counter');
 
-/** Resize canvas to match display. */
 function resizeCanvas() {
   const dpr = window.devicePixelRatio || 1;
   canvas.width = window.innerWidth * dpr;
   canvas.height = window.innerHeight * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  if (camera) camera.resize(window.innerWidth, window.innerHeight);
 }
+
+// ── Initialize systems ───────────────────────────────
+const eventBus = new EventBus();
+const world = new World();
+
+// Generate map with random seed
+const seed = Math.floor(Math.random() * 1000000);
+MapGenerator.generate(world, seed);
+
+const camera = new Camera(window.innerWidth, window.innerHeight);
+const tileRenderer = new TileRenderer(ctx, world, camera);
+const minimap = new Minimap(ctx, world, camera, eventBus);
+const inputManager = new InputManager(canvas, camera, eventBus);
+
+// Handle minimap clicks
+eventBus.subscribe(EVENTS.INPUT_CLICK, (e) => {
+  minimap.handleClick(e.screenX, e.screenY);
+});
 
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 
-const eventBus = new EventBus();
-
+// ── Game loop ────────────────────────────────────────
 function update(dt) {
-  // Phase 1+ systems will register here
+  inputManager.update(dt);
 }
 
 function render(alpha) {
@@ -31,7 +55,8 @@ function render(alpha) {
   ctx.fillStyle = COLORS.BG;
   ctx.fillRect(0, 0, w, h);
 
-  // Phase 1+ renderers will draw here
+  tileRenderer.render(alpha);
+  minimap.render();
 
   fpsEl.textContent = `FPS: ${gameLoop.fps}`;
 }
