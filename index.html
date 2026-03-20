@@ -190,6 +190,25 @@
       font-family: 'MedievalSharp', cursive;
       font-size: 14px;
     }
+    /* ── Placement Preview ─────────────────────────────── */
+    #placement-info {
+      position: fixed;
+      bottom: 60px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 6px 16px;
+      background: rgba(30, 25, 20, 0.9);
+      border: 1px solid #6a5a45;
+      border-radius: 4px;
+      color: #c0b090;
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      z-index: 201;
+      pointer-events: none;
+      display: none;
+    }
+    .placement-valid { color: #80c040; }
+    .placement-invalid { color: #c04040; }
   </style>
 </head>
 <body>
