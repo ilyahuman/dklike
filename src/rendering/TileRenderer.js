@@ -1,4 +1,4 @@
-import { TILE_TYPES, TILE_SIZE, COLORS } from '../constants.js';
+import { TILE_TYPES, TILE_SIZE, COLORS, ROOM_TYPES } from '../constants.js';
 
 /**
  * Draws only the tiles visible in the camera viewport.
@@ -10,11 +10,13 @@ export class TileRenderer {
    * @param {CanvasRenderingContext2D} ctx
    * @param {import('../world/World.js').World} world
    * @param {import('./Camera.js').Camera} camera
+   * @param {import('../world/RoomManager.js').RoomManager|null} roomManager
    */
-  constructor(ctx, world, camera) {
+  constructor(ctx, world, camera, roomManager) {
     this._ctx = ctx;
     this._world = world;
     this._camera = camera;
+    this._roomManager = roomManager;
     // Pre-generate noise seeds for tile variation
     this._noiseSeed = new Uint8Array(world.width * world.height);
     for (let i = 0; i < this._noiseSeed.length; i++) {
@@ -40,6 +42,14 @@ export class TileRenderer {
         const noise = this._noiseSeed[y * this._world.width + x];
 
         this._drawTile(ctx, type, sx, sy, size, noise, x, y);
+
+        // Draw room overlay if this tile belongs to a room
+        if (this._roomManager) {
+          const room = this._roomManager.getRoomAt(x, y);
+          if (room) {
+            this._drawRoomOverlay(ctx, room.type, sx, sy, size, noise);
+          }
+        }
       }
     }
   }
@@ -197,6 +207,116 @@ export class TileRenderer {
     ctx.beginPath();
     ctx.moveTo(x + size * 0.2, y + size * (0.7 + Math.sin(t * 0.8 + noise) * 0.05));
     ctx.lineTo(x + size * 0.8, y + size * (0.7 + Math.sin(t * 0.8 + noise + 1) * 0.05));
+    ctx.stroke();
+  }
+
+  /** @private */
+  _drawRoomOverlay(ctx, roomType, x, y, size, noise) {
+    switch (roomType) {
+      case ROOM_TYPES.DUNGEON_HEART:
+        this._drawDungeonHeartOverlay(ctx, x, y, size, noise);
+        break;
+      case ROOM_TYPES.LAIR:
+        this._drawLairOverlay(ctx, x, y, size, noise);
+        break;
+      case ROOM_TYPES.HATCHERY:
+        this._drawHatcheryOverlay(ctx, x, y, size, noise);
+        break;
+      case ROOM_TYPES.TREASURY:
+        this._drawTreasuryOverlay(ctx, x, y, size, noise);
+        break;
+      case ROOM_TYPES.TRAINING_ROOM:
+        this._drawTrainingOverlay(ctx, x, y, size, noise);
+        break;
+    }
+  }
+
+  /** Dungeon Heart: pulsing red glow. @private */
+  _drawDungeonHeartOverlay(ctx, x, y, size, noise) {
+    const t = performance.now() / 1000;
+    const pulse = 0.15 + Math.sin(t * 2) * 0.08;
+    ctx.fillStyle = `rgba(200, 40, 40, ${pulse})`;
+    ctx.fillRect(x, y, size, size);
+    ctx.fillStyle = '#e02020';
+    ctx.beginPath();
+    const cx = x + size / 2;
+    const cy = y + size / 2;
+    ctx.arc(cx, cy, size / 6, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = `rgba(255, 100, 100, ${0.5 + Math.sin(t * 3) * 0.3})`;
+    ctx.beginPath();
+    ctx.arc(cx, cy, size / 10, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  /** Lair: bedding texture (brown patches). @private */
+  _drawLairOverlay(ctx, x, y, size, noise) {
+    ctx.fillStyle = 'rgba(100, 70, 40, 0.3)';
+    ctx.fillRect(x + size * 0.15, y + size * 0.15, size * 0.7, size * 0.7);
+    ctx.strokeStyle = 'rgba(180, 150, 80, 0.4)';
+    ctx.lineWidth = 0.5;
+    for (let i = 0; i < 4; i++) {
+      const sx = x + ((noise * (i + 1) * 13) % 20 + 6) * size / 32;
+      const sy = y + ((noise * (i + 2) * 7) % 20 + 6) * size / 32;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(sx + size / 8, sy + size / 12);
+      ctx.stroke();
+    }
+  }
+
+  /** Hatchery: chicken coop/food tiles. @private */
+  _drawHatcheryOverlay(ctx, x, y, size, noise) {
+    ctx.fillStyle = 'rgba(60, 100, 40, 0.25)';
+    ctx.fillRect(x, y, size, size);
+    ctx.fillStyle = 'rgba(140, 100, 50, 0.5)';
+    ctx.beginPath();
+    ctx.ellipse(x + size / 2, y + size * 0.6, size / 4, size / 8, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = 'rgba(200, 160, 60, 0.6)';
+    for (let i = 0; i < 3; i++) {
+      const fx = x + size * 0.35 + (noise * (i + 1) % 10) * size / 32;
+      const fy = y + size * 0.5 + (noise * (i + 2) % 6) * size / 32;
+      ctx.fillRect(fx, fy, size / 12, size / 12);
+    }
+  }
+
+  /** Treasury: gold pile pattern. @private */
+  _drawTreasuryOverlay(ctx, x, y, size, noise) {
+    ctx.fillStyle = 'rgba(180, 140, 30, 0.15)';
+    ctx.fillRect(x, y, size, size);
+    ctx.fillStyle = 'rgba(240, 200, 60, 0.5)';
+    for (let i = 0; i < 5; i++) {
+      const cx = x + ((noise * (i + 1) * 11) % 24 + 4) * size / 32;
+      const cy = y + ((noise * (i + 2) * 17) % 24 + 4) * size / 32;
+      ctx.beginPath();
+      ctx.arc(cx, cy, size / 14, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.fillStyle = 'rgba(255, 230, 100, 0.3)';
+    ctx.beginPath();
+    ctx.arc(x + size / 2, y + size / 2, size / 5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  /** Training Room: target dummy / crossed swords. @private */
+  _drawTrainingOverlay(ctx, x, y, size, noise) {
+    ctx.fillStyle = 'rgba(80, 40, 40, 0.2)';
+    ctx.fillRect(x, y, size, size);
+    ctx.strokeStyle = 'rgba(160, 120, 80, 0.5)';
+    ctx.lineWidth = 1;
+    const cx = x + size / 2;
+    const cy = y + size / 2;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - size / 5);
+    ctx.lineTo(cx, cy + size / 4);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(cx - size / 6, cy - size / 10);
+    ctx.lineTo(cx + size / 6, cy - size / 10);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.arc(cx, cy - size / 4, size / 10, 0, Math.PI * 2);
     ctx.stroke();
   }
 }
