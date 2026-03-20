@@ -53,6 +53,9 @@ export class EntityRenderer {
         case ENTITY_TYPES.WIZARD:
           this._drawWizard(ctx, sx, sy, zoom, entity);
           break;
+        case ENTITY_TYPES.DOOR:
+          this._drawDoor(ctx, sx, sy, zoom, entity);
+          break;
       }
     }
   }
@@ -372,5 +375,51 @@ export class EntityRenderer {
 
     ctx.restore();
     this._drawHealthBar(ctx, sx, sy, size, entity);
+  }
+
+  /** @private Door: wooden door with planks, animates open for nearby friendlies */
+  _drawDoor(ctx, sx, sy, zoom, entity) {
+    const size = TILE_SIZE * zoom;
+    const halfSize = size / 2;
+    const isOpen = entity._isOpen || false;
+
+    ctx.save();
+    ctx.translate(sx, sy);
+
+    // Door frame (dark stone)
+    ctx.fillStyle = '#4a4040';
+    ctx.fillRect(-halfSize * 0.9, -halfSize * 0.9, size * 0.9, size * 0.9);
+
+    if (isOpen) {
+      // Open door: thin sliver on side
+      ctx.globalAlpha = 0.5;
+      ctx.fillStyle = '#6a4a2a';
+      ctx.fillRect(-halfSize * 0.8, -halfSize * 0.8, size * 0.15, size * 0.8);
+      ctx.globalAlpha = 1;
+    } else {
+      // Closed door: full planks
+      ctx.fillStyle = '#6a4a2a';
+      ctx.fillRect(-halfSize * 0.7, -halfSize * 0.8, size * 0.7, size * 0.8);
+
+      // Horizontal bands (iron)
+      ctx.fillStyle = '#555';
+      const bandH = 2 * zoom;
+      ctx.fillRect(-halfSize * 0.7, -halfSize * 0.5, size * 0.7, bandH);
+      ctx.fillRect(-halfSize * 0.7, -halfSize * 0.1, size * 0.7, bandH);
+      ctx.fillRect(-halfSize * 0.7, halfSize * 0.3, size * 0.7, bandH);
+
+      // Handle
+      ctx.fillStyle = '#888';
+      ctx.beginPath();
+      ctx.arc(halfSize * 0.2, 0, 2 * zoom, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+
+    // Health bar when damaged
+    if (entity.health < entity.maxHealth) {
+      this._drawHealthBar(ctx, sx, sy, size * 0.8, entity);
+    }
   }
 }
