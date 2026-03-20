@@ -50,7 +50,7 @@ export class Toolbar {
     this._el.appendChild(div);
 
     for (const t of disabledTools) {
-      this._el.appendChild(this._createButton(t, true));
+      this._el.appendChild(this._createButton(t, false));
     }
 
     // Another divider
@@ -105,11 +105,7 @@ export class Toolbar {
       };
       const tool = map[e.code];
       if (tool) {
-        // Only select if not disabled (tools 6-9 are disabled in Phase 3)
-        const btn = this._el.querySelector(`[data-tool-id="${tool}"]`);
-        if (btn && !btn.classList.contains('disabled')) {
-          this._selectTool(tool);
-        }
+        this._selectTool(tool);
       }
     });
   }
