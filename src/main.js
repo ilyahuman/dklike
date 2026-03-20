@@ -17,6 +17,10 @@ import { Imp } from './entities/Imp.js';
 import { HUD } from './ui/HUD.js';
 import { Toolbar } from './ui/Toolbar.js';
 import { Tooltip } from './ui/Tooltip.js';
+import { CombatSystem } from './systems/CombatSystem.js';
+import { CreatureSpawner } from './systems/CreatureSpawner.js';
+import { WaveManager } from './systems/WaveManager.js';
+import { FloatingText } from './rendering/FloatingText.js';
 import {
   COLORS, EVENTS, TILE_SIZE, TILE_TYPES, ROOM_TYPES,
   ROOM_CONFIG, RESOURCES, ENTITY_TYPES,
@@ -60,6 +64,12 @@ const resourceManager = new ResourceManager(eventBus);
 const hud = new HUD(hudOverlay, eventBus, resourceManager, entityManager);
 const toolbar = new Toolbar(hudOverlay, eventBus);
 const tooltip = new Tooltip(hudOverlay, world, roomManager, entityManager);
+
+// Phase 4 systems
+const combatSystem = new CombatSystem(entityManager, eventBus);
+const creatureSpawner = new CreatureSpawner(world, entityManager, eventBus, roomManager);
+const waveManager = new WaveManager(world, entityManager, eventBus, roomManager);
+const floatingText = new FloatingText(ctx, camera);
 
 // ── Register Dungeon Heart room ──────────────────────
 const heartCx = Math.floor(world.width / 2);
@@ -254,6 +264,33 @@ eventBus.subscribe(EVENTS.ROOM_REMOVED, (e) => {
   }
 });
 
+// Floating damage text
+eventBus.subscribe(EVENTS.ENTITY_DAMAGED, (e) => {
+  floatingText.add(e.x, e.y - TILE_SIZE / 2, `-${e.damage}`, '#ff4040');
+});
+
+// Entity death — particles + gold drop
+eventBus.subscribe(EVENTS.ENTITY_DIED, (e) => {
+  const color = e.team === 'enemy' ? '#f0f0a0' : '#a04040';
+  particleSystem.burst(e.x, e.y, color, 12, { speed: 80, life: 0.6, size: 2 });
+  if (e.goldDrop > 0) {
+    resourceManager.earnGold(e.goldDrop);
+    floatingText.add(e.x, e.y - TILE_SIZE, `+${e.goldDrop}g`, '#f0c040');
+  }
+});
+
+// Wave started — screen flash
+let waveFlashTimer = 0;
+eventBus.subscribe(EVENTS.WAVE_STARTED, () => {
+  waveFlashTimer = 2.0;
+});
+
+// Creature spawned — floating text + particles
+eventBus.subscribe(EVENTS.ENTITY_SPAWNED, (e) => {
+  floatingText.add(e.x, e.y - TILE_SIZE, 'Creature attracted!', '#80ff80');
+  particleSystem.burst(e.x, e.y, '#80ff80', 10, { speed: 60, life: 0.5, size: 2 });
+});
+
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
 
@@ -263,6 +300,10 @@ function update(dt) {
   entityManager.update(dt);
   particleSystem.update(dt);
   resourceManager.update(dt);
+  combatSystem.update(dt);
+  creatureSpawner.update(dt);
+  waveManager.update(dt);
+  floatingText.update(dt);
 }
 
 let lastRenderTime = performance.now();
@@ -281,6 +322,7 @@ function render(alpha) {
   tileRenderer.render(alpha);
   entityRenderer.render(alpha);
   particleSystem.render();
+  floatingText.render();
   minimap.render();
 
   // Dig queue highlights
@@ -324,6 +366,24 @@ function render(alpha) {
 
   // HUD update (tween gold, imp count)
   hud.update(renderDt);
+
+  // Wave flash overlay
+  if (waveFlashTimer > 0) {
+    waveFlashTimer -= renderDt;
+    const flashAlpha = Math.min(1, waveFlashTimer / 2) * 0.3;
+    ctx.fillStyle = `rgba(255, 0, 0, ${flashAlpha})`;
+    ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = '#fff';
+    ctx.font = 'bold 48px MedievalSharp, cursive';
+    ctx.textAlign = 'center';
+    ctx.globalAlpha = Math.min(1, waveFlashTimer);
+    ctx.fillText('INTRUDERS!', w / 2, h / 2);
+    ctx.globalAlpha = 1;
+    ctx.textAlign = 'start';
+  }
+
+  // Update HUD wave timer
+  hud.setWaveTimer(`${waveManager.countdown}s`);
 
   fpsEl.textContent = `FPS: ${gameLoop.fps}`;
 }
