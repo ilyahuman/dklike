@@ -18,7 +18,7 @@ export class RoomManager {
 
   placeRoom(type, tiles) {
     const id = this._nextId++;
-    const room = { id, type, tiles: tiles.map(t => ({ x: t.x, y: t.y })) };
+    const room = { id, type, tiles: tiles.map(t => ({ x: t.x, y: t.y })), placedAt: performance.now() };
     this._rooms.set(id, room);
     for (const t of room.tiles) {
       this._tileToRoom.set(`${t.x},${t.y}`, id);

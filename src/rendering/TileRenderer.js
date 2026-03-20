@@ -47,7 +47,11 @@ export class TileRenderer {
         if (this._roomManager) {
           const room = this._roomManager.getRoomAt(x, y);
           if (room) {
+            const age = (performance.now() - (room.placedAt || 0)) / 1000;
+            const fadeAlpha = Math.min(1, age / 0.3);
+            ctx.globalAlpha = fadeAlpha;
             this._drawRoomOverlay(ctx, room.type, sx, sy, size, noise);
+            ctx.globalAlpha = 1;
           }
         }
       }
