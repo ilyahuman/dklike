@@ -155,6 +155,110 @@ describe('SpellSystem', () => {
     });
   });
 
+  // ── Lightning Strike ────────────────────────────────
+
+  describe('Lightning Strike', () => {
+    it('should deal AoE damage to enemies in radius', () => {
+      const mockEnemy = {
+        id: 'enemy1',
+        x: 100,
+        y: 100,
+        alive: true,
+        team: 'dungeon',
+        type: ENTITY_TYPES.TROLL,
+        takeDamage: vi.fn(),
+        isDead: vi.fn(() => false),
+      };
+      entityManager.getEntitiesInRadius.mockReturnValue([mockEnemy]);
+
+      const result = spellSystem.castLightningStrike(100, 100);
+
+      expect(result).toBe(true);
+      expect(mockEnemy.takeDamage).toHaveBeenCalledWith(SPELL_CONFIG[SPELL_TYPES.LIGHTNING_STRIKE].damage);
+      expect(eventBus.publish).toHaveBeenCalledWith(
+        EVENTS.ENTITY_DAMAGED,
+        expect.objectContaining({ targetId: 'enemy1', damage: 80 }),
+      );
+    });
+
+    it('should not cast when only friendly targets in area', () => {
+      const mockFriendly = {
+        id: 'ally1',
+        x: 100,
+        y: 100,
+        alive: true,
+        team: 'player',
+        type: ENTITY_TYPES.IMP,
+      };
+      entityManager.getEntitiesInRadius.mockReturnValue([mockFriendly]);
+
+      const result = spellSystem.castLightningStrike(100, 100);
+
+      expect(result).toBe(false);
+      expect(resourceManager.spendMana).not.toHaveBeenCalled();
+    });
+
+    it('should fail when mana is insufficient', () => {
+      resourceManager.mana = 0;
+      const mockEnemy = {
+        id: 'enemy1',
+        x: 100,
+        y: 100,
+        alive: true,
+        team: 'dungeon',
+      };
+      entityManager.getEntitiesInRadius.mockReturnValue([mockEnemy]);
+
+      const result = spellSystem.castLightningStrike(100, 100);
+
+      expect(result).toBe(false);
+    });
+
+    it('should publish SPELL_CAST event on success', () => {
+      entityManager.getEntitiesInRadius.mockReturnValue([]); // Empty area
+
+      const result = spellSystem.castLightningStrike(200, 300);
+
+      expect(result).toBe(true);
+      expect(eventBus.publish).toHaveBeenCalledWith(
+        EVENTS.SPELL_CAST,
+        expect.objectContaining({
+          spell: SPELL_TYPES.LIGHTNING_STRIKE,
+          x: 200,
+          y: 300,
+        }),
+      );
+    });
+
+    it('should kill entities reduced to 0 HP', () => {
+      const mockEnemy = {
+        id: 'enemy1',
+        x: 100,
+        y: 100,
+        alive: true,
+        team: 'dungeon',
+        type: ENTITY_TYPES.TROLL,
+        goldDrop: 50,
+        takeDamage: vi.fn(),
+        isDead: vi.fn(() => true),
+      };
+      entityManager.getEntitiesInRadius.mockReturnValue([mockEnemy]);
+
+      const result = spellSystem.castLightningStrike(100, 100);
+
+      expect(result).toBe(true);
+      expect(mockEnemy.alive).toBe(false);
+      expect(eventBus.publish).toHaveBeenCalledWith(
+        EVENTS.ENTITY_DIED,
+        expect.objectContaining({
+          entityId: 'enemy1',
+          type: ENTITY_TYPES.TROLL,
+          goldDrop: 50,
+        }),
+      );
+    });
+  });
+
   // ── update ───────────────────────────────────────────
 
   describe('update', () => {
