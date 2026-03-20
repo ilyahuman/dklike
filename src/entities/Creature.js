@@ -41,6 +41,7 @@ export class Creature extends Entity {
   }
 
   update(dt) {
+    if (this._aiSuspended) return;
     this.hunger = Math.max(0, this.hunger - dt * 0.5);
     this.energy = Math.max(0, this.energy - dt * 0.3);
 

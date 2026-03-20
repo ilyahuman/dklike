@@ -278,6 +278,161 @@ describe('SpellSystem', () => {
     });
   });
 
+  // ── Possess Creature ─────────────────────────────────
+
+  describe('Possess Creature', () => {
+    let mockCreature;
+
+    beforeEach(() => {
+      mockCreature = {
+        id: 50, type: 'troll', team: 'player', alive: true,
+        x: 100, y: 100, _aiSuspended: false, _facingRight: true,
+        _attackTimer: 0, attackRange: 1.2, attackCooldown: 1.0, damage: 15,
+        speed: 40,
+        getEffectiveSpeed: () => 40,
+      };
+      entityManager.add(mockCreature);
+    });
+
+    it('should possess a player creature and spend mana', () => {
+      const result = spellSystem.castPossess(50);
+      expect(result).toBe(true);
+      expect(spellSystem.isPossessing).toBe(true);
+      expect(spellSystem.possessedEntityId).toBe(50);
+      expect(mockCreature._aiSuspended).toBe(true);
+    });
+
+    it('should not possess enemy entities', () => {
+      mockCreature.team = 'enemy';
+      const result = spellSystem.castPossess(50);
+      expect(result).toBe(false);
+    });
+
+    it('should fail when mana insufficient', () => {
+      resourceManager.mana = 0;
+      const result = spellSystem.castPossess(50);
+      expect(result).toBe(false);
+    });
+
+    it('should unpossess and restore AI', () => {
+      spellSystem.castPossess(50);
+      spellSystem.unpossess();
+      expect(spellSystem.isPossessing).toBe(false);
+      expect(mockCreature._aiSuspended).toBe(false);
+    });
+
+    it('should publish POSSESS_START with entityType and POSSESS_END events', () => {
+      spellSystem.castPossess(50);
+      expect(eventBus.publish).toHaveBeenCalledWith(
+        EVENTS.POSSESS_START,
+        expect.objectContaining({ entityId: 50, entityType: 'troll' }),
+      );
+
+      spellSystem.unpossess();
+      expect(eventBus.publish).toHaveBeenCalledWith(
+        EVENTS.POSSESS_END,
+        expect.objectContaining({ entityId: 50, reason: 'manual' }),
+      );
+    });
+
+    it('should auto-unpossess with reason=death if creature dies during update', () => {
+      spellSystem.castPossess(50);
+      mockCreature.alive = false;
+      spellSystem.update(0.1);
+      expect(spellSystem.isPossessing).toBe(false);
+      expect(eventBus.publish).toHaveBeenCalledWith(
+        EVENTS.POSSESS_END,
+        expect.objectContaining({ entityId: 50, reason: 'death' }),
+      );
+    });
+  });
+
+  // ── movePossessed ──────────────────────────────────
+
+  describe('movePossessed', () => {
+    let mockCreature;
+
+    beforeEach(() => {
+      mockCreature = {
+        id: 50, type: 'troll', team: 'player', alive: true,
+        x: 100, y: 100, _aiSuspended: false, _facingRight: true,
+        _attackTimer: 0, attackRange: 1.2, attackCooldown: 1.0, damage: 15,
+        speed: 40,
+        getEffectiveSpeed: () => 40,
+      };
+      entityManager.add(mockCreature);
+      spellSystem.castPossess(50);
+    });
+
+    it('should move possessed creature when tile is walkable', () => {
+      const oldX = mockCreature.x;
+      spellSystem.movePossessed(1, 0, 0.1);
+      expect(mockCreature.x).toBeGreaterThan(oldX);
+    });
+
+    it('should not move when target tile is not walkable', () => {
+      world.isWalkable.mockReturnValue(false);
+      const oldX = mockCreature.x;
+      spellSystem.movePossessed(1, 0, 0.1);
+      expect(mockCreature.x).toBe(oldX);
+    });
+  });
+
+  // ── possessedAttack ────────────────────────────────
+
+  describe('possessedAttack', () => {
+    let mockCreature, mockEnemy;
+
+    beforeEach(() => {
+      mockCreature = {
+        id: 50, type: 'troll', team: 'player', alive: true,
+        x: 100, y: 100, _aiSuspended: false, _facingRight: true,
+        _attackTimer: 0, attackRange: 1.2, attackCooldown: 1.0, damage: 15,
+        speed: 40,
+        getEffectiveSpeed: () => 40,
+      };
+      mockEnemy = {
+        id: 60, type: 'knight', team: 'enemy', alive: true,
+        x: 130, y: 100, health: 150, maxHealth: 150, goldDrop: 50,
+        takeDamage: vi.fn(function(d) { this.health -= d; }),
+        isDead: vi.fn(function() { return this.health <= 0; }),
+      };
+      entityManager.add(mockCreature);
+      entityManager.add(mockEnemy);
+      entityManager.getEntitiesInRadius.mockReturnValue([mockEnemy]);
+      spellSystem.castPossess(50);
+    });
+
+    it('should attack nearest enemy in range', () => {
+      const result = spellSystem.possessedAttack();
+      expect(result).toBe(true);
+      expect(mockEnemy.takeDamage).toHaveBeenCalledWith(15);
+    });
+
+    it('should not attack when on cooldown', () => {
+      mockCreature._attackTimer = 0.5;
+      const result = spellSystem.possessedAttack();
+      expect(result).toBe(false);
+    });
+
+    it('should not attack when no enemies in range', () => {
+      entityManager.getEntitiesInRadius.mockReturnValue([]);
+      const result = spellSystem.possessedAttack();
+      expect(result).toBe(false);
+    });
+
+    it('should kill enemy when HP reaches 0', () => {
+      mockEnemy.health = 10;
+      const result = spellSystem.possessedAttack();
+      expect(result).toBe(true);
+      expect(mockEnemy.alive).toBe(false);
+      expect(eventBus.publish).toHaveBeenCalledWith(
+        EVENTS.ENTITY_DIED,
+        expect.objectContaining({ entityId: 60 }),
+      );
+    });
+  });
+
   // ── Possess getters (initial state) ──────────────────
 
   describe('possess getters', () => {
