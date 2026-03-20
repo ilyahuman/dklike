@@ -1,6 +1,6 @@
 import { Entity } from './Entity.js';
 import { Pathfinder } from '../world/Pathfinder.js';
-import { CREATURE_STATES, TILE_SIZE, WAVE } from '../constants.js';
+import { CREATURE_STATES, TILE_SIZE, WAVE, ENTITY_TYPES } from '../constants.js';
 
 /**
  * Shared base class for hero entities (Knight, Thief, Wizard).
@@ -29,6 +29,7 @@ export class Hero extends Entity {
     this._pathIndex = 0;
     this._repathTimer = 0;
     this._facingRight = true;
+    this._attackingDoor = null;
 
     this._repath();
   }
@@ -39,6 +40,25 @@ export class Hero extends Entity {
       this._repathTimer = 0;
       this._repath();
     }
+
+    // Check for door blocking path
+    const door = this._checkForDoor();
+    if (door) {
+      this._attackingDoor = door;
+      this.state = CREATURE_STATES.ATTACKING;
+      this._facingRight = door.x > this.x;
+      return; // Stop moving, CombatSystem handles damage
+    }
+
+    if (this._attackingDoor) {
+      if (!this._attackingDoor.alive) {
+        this._attackingDoor = null;
+        this.state = CREATURE_STATES.MOVING;
+      } else {
+        return; // Still attacking door
+      }
+    }
+
     this._followPath(dt);
   }
 
@@ -84,6 +104,20 @@ export class Hero extends Entity {
     this.x += (dx / dist) * move;
     this.y += (dy / dist) * move;
     this._facingRight = dx > 0;
+  }
+
+  /** Check for a door entity blocking the hero's path. */
+  _checkForDoor() {
+    if (!this._entityManager) return null;
+    for (const e of this._entityManager.getAll()) {
+      if (e.type !== ENTITY_TYPES.DOOR || !e.alive) continue;
+      const dx = Math.abs(e.x - this.x);
+      const dy = Math.abs(e.y - this.y);
+      if (dx < TILE_SIZE * 1.2 && dy < TILE_SIZE * 1.2) {
+        return e;
+      }
+    }
+    return null;
   }
 
   get facingRight() { return this._facingRight; }
