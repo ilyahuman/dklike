@@ -15,6 +15,7 @@ export class GameLoop {
     this._render = renderFn;
     this._rafId = null;
     this._running = false;
+    this._paused = false;
     this._accumulator = 0;
     this._lastTime = 0;
     this.speedMultiplier = 1;
@@ -52,6 +53,24 @@ export class GameLoop {
     this.speedMultiplier = multiplier;
   }
 
+  /**
+   * Get pause state.
+   * @returns {boolean}
+   */
+  get isPaused() {
+    return this._paused;
+  }
+
+  /** Pause the game loop. Updates are skipped; rendering continues. */
+  pause() {
+    this._paused = true;
+  }
+
+  /** Resume the game loop. */
+  resume() {
+    this._paused = false;
+  }
+
   /** @private */
   _tick(now) {
     if (!this._running) return;
@@ -66,6 +85,12 @@ export class GameLoop {
       this.fps = this._frameCount;
       this._frameCount = 0;
       this._fpsTimer -= 1000;
+    }
+
+    if (this._paused) {
+      this._render(0);
+      this._rafId = requestAnimationFrame(this._tick);
+      return;
     }
 
     // Accumulate time, scaled by speed multiplier

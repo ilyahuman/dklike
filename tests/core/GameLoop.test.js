@@ -101,4 +101,24 @@ describe('GameLoop', () => {
     vi.advanceTimersByTime(100);
     expect(loop.fps).toBeGreaterThanOrEqual(0);
   });
+
+  describe('pause/resume', () => {
+    it('isPaused should default to false', () => {
+      loop = new GameLoop(updateFn, renderFn);
+      expect(loop.isPaused).toBe(false);
+    });
+
+    it('pause() should set isPaused to true', () => {
+      loop = new GameLoop(updateFn, renderFn);
+      loop.pause();
+      expect(loop.isPaused).toBe(true);
+    });
+
+    it('resume() should set isPaused to false', () => {
+      loop = new GameLoop(updateFn, renderFn);
+      loop.pause();
+      loop.resume();
+      expect(loop.isPaused).toBe(false);
+    });
+  });
 });
