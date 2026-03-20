@@ -46,6 +46,29 @@ export class HUD {
     `;
     container.appendChild(this._el);
 
+    // Possess overlay
+    this._possessOverlay = document.createElement('div');
+    this._possessOverlay.id = 'possess-overlay';
+    this._possessOverlay.style.cssText = `
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      pointer-events: none; display: none; z-index: 150;
+    `;
+    this._possessOverlay.innerHTML = `
+      <div style="position:absolute;top:0;left:0;width:100%;height:100%;
+        box-shadow:inset 0 0 100px rgba(200,0,0,0.4);pointer-events:none;"></div>
+      <div id="possess-label" style="position:absolute;top:60px;left:50%;transform:translateX(-50%);
+        font-family:'MedievalSharp',cursive;font-size:20px;color:#ff6060;
+        text-shadow:0 0 10px rgba(200,0,0,0.8);pointer-events:none;">
+        POSSESSING
+      </div>
+      <div style="position:absolute;bottom:80px;left:50%;transform:translateX(-50%);
+        font-family:'Inter',sans-serif;font-size:12px;color:#c08080;pointer-events:none;">
+        WASD: Move | Click: Attack | ESC: Release
+      </div>
+    `;
+    container.appendChild(this._possessOverlay);
+    this._possessLabel = this._possessOverlay.querySelector('#possess-label');
+
     this._goldEl = this._el.querySelector('#hud-gold');
     this._manaFill = this._el.querySelector('#hud-mana-fill');
     this._manaText = this._el.querySelector('#hud-mana-text');
@@ -60,6 +83,16 @@ export class HUD {
       const manaPercent = (data.mana / data.manaCap) * 100;
       this._manaFill.style.width = `${manaPercent}%`;
       this._manaText.textContent = `${Math.floor(data.mana)}/${data.manaCap}`;
+    });
+
+    this._eventBus.subscribe(EVENTS.POSSESS_START, (data) => {
+      this._possessOverlay.style.display = 'block';
+      const name = (data.entityType || 'creature').replace(/_/g, ' ').toUpperCase();
+      this._possessLabel.textContent = `POSSESSING ${name}`;
+    });
+
+    this._eventBus.subscribe(EVENTS.POSSESS_END, () => {
+      this._possessOverlay.style.display = 'none';
     });
   }
 
