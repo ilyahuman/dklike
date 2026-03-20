@@ -1,4 +1,4 @@
-import { RESOURCES, EVENTS } from '../constants.js';
+import { RESOURCES, EVENTS, DUNGEON_HEART_HP } from '../constants.js';
 
 /**
  * Tracks gold and mana resources.
@@ -13,12 +13,17 @@ export class ResourceManager {
     this._mana = 0;
     this._goldCap = RESOURCES.GOLD_BASE_CAP;
     this._manaCap = RESOURCES.MANA_CAP;
+    this._heartHP = DUNGEON_HEART_HP;
+    this._heartMaxHP = DUNGEON_HEART_HP;
   }
 
   get gold() { return this._gold; }
   get mana() { return this._mana; }
   get goldCap() { return this._goldCap; }
   get manaCap() { return this._manaCap; }
+  get heartHP() { return this._heartHP; }
+  get heartMaxHP() { return this._heartMaxHP; }
+  get isHeartDestroyed() { return this._heartHP <= 0; }
 
   earnGold(amount) {
     const prev = this._gold;
@@ -47,6 +52,16 @@ export class ResourceManager {
     return true;
   }
 
+  damageHeart(amount) {
+    this._heartHP = Math.max(0, this._heartHP - amount);
+    this._publish();
+  }
+
+  resetHeart() {
+    this._heartHP = this._heartMaxHP;
+    this._publish();
+  }
+
   setTreasuryTileCount(tileCount) {
     this._goldCap = RESOURCES.GOLD_BASE_CAP + tileCount * RESOURCES.GOLD_PER_TREASURY_TILE;
     if (this._gold > this._goldCap) this._gold = this._goldCap;
@@ -65,6 +80,8 @@ export class ResourceManager {
       mana: this._mana,
       goldCap: this._goldCap,
       manaCap: this._manaCap,
+      heartHP: this._heartHP,
+      heartMaxHP: this._heartMaxHP,
     };
   }
 

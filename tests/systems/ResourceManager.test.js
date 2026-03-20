@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { ResourceManager } from '../../src/systems/ResourceManager.js';
 import { EventBus } from '../../src/core/EventBus.js';
-import { RESOURCES, EVENTS } from '../../src/constants.js';
+import { RESOURCES, EVENTS, DUNGEON_HEART_HP } from '../../src/constants.js';
 
 describe('ResourceManager', () => {
   it('starts with zero gold and zero mana', () => {
@@ -83,5 +83,39 @@ describe('ResourceManager', () => {
     expect(snap.mana).toBeCloseTo(RESOURCES.MANA_REGEN_PER_SEC);
     expect(snap.goldCap).toBe(RESOURCES.GOLD_BASE_CAP);
     expect(snap.manaCap).toBe(RESOURCES.MANA_CAP);
+  });
+});
+
+describe('Dungeon Heart HP', () => {
+  it('should start with full HP', () => {
+    const rm = new ResourceManager(new EventBus());
+    expect(rm.heartHP).toBe(DUNGEON_HEART_HP);
+    expect(rm.heartMaxHP).toBe(DUNGEON_HEART_HP);
+  });
+
+  it('damageHeart should reduce HP', () => {
+    const rm = new ResourceManager(new EventBus());
+    rm.damageHeart(100);
+    expect(rm.heartHP).toBe(DUNGEON_HEART_HP - 100);
+  });
+
+  it('damageHeart should not go below 0', () => {
+    const rm = new ResourceManager(new EventBus());
+    rm.damageHeart(DUNGEON_HEART_HP + 100);
+    expect(rm.heartHP).toBe(0);
+  });
+
+  it('should return true from isHeartDestroyed when HP is 0', () => {
+    const rm = new ResourceManager(new EventBus());
+    rm.damageHeart(DUNGEON_HEART_HP);
+    expect(rm.isHeartDestroyed).toBe(true);
+  });
+
+  it('should publish RESOURCES_CHANGED when heart damaged', () => {
+    const eb = new EventBus();
+    vi.spyOn(eb, 'publish');
+    const rm = new ResourceManager(eb);
+    rm.damageHeart(50);
+    expect(eb.publish).toHaveBeenCalledWith(EVENTS.RESOURCES_CHANGED, expect.objectContaining({ heartHP: DUNGEON_HEART_HP - 50 }));
   });
 });
