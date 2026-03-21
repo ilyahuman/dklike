@@ -1,6 +1,6 @@
 import { Entity } from './Entity.js';
 import { Pathfinder } from '../world/Pathfinder.js';
-import { CREATURE_STATES, TILE_SIZE, WAVE, ENTITY_TYPES } from '../constants.js';
+import { CREATURE_STATES, TILE_SIZE, TILE_TYPES, WAVE, ENTITY_TYPES, EVENTS } from '../constants.js';
 
 /**
  * Shared base class for hero entities (Knight, Thief, Wizard).
@@ -30,11 +30,27 @@ export class Hero extends Entity {
     this._repathTimer = 0;
     this._facingRight = true;
     this._attackingDoor = null;
+    this._digTimer = 0;
+    this._digTargetX = -1;
+    this._digTargetY = -1;
 
     this._repath();
   }
 
   update(dt) {
+    // Digging state: dig through walls toward heart
+    if (this.state === CREATURE_STATES.DIGGING) {
+      this._repathTimer += dt;
+      if (this._repathTimer >= WAVE.REPATH_INTERVAL_SEC) {
+        this._repathTimer = 0;
+        this._repath(); // check if a path opened up
+      }
+      if (this.state === CREATURE_STATES.DIGGING) {
+        this._updateDigging(dt);
+      }
+      return;
+    }
+
     this._repathTimer += dt;
     if (this._repathTimer >= WAVE.REPATH_INTERVAL_SEC) {
       this._repathTimer = 0;
@@ -65,6 +81,16 @@ export class Hero extends Entity {
   /** Override in subclasses for different targeting. */
   _repath() {
     this._pathToDungeonHeart();
+    // If no path found, enter digging state
+    if (!this._path) {
+      if (this.state !== CREATURE_STATES.DIGGING) {
+        this.state = CREATURE_STATES.DIGGING;
+        this._pickDigTarget();
+      }
+    } else if (this.state === CREATURE_STATES.DIGGING) {
+      this.state = CREATURE_STATES.MOVING;
+      this._digTimer = 0;
+    }
   }
 
   _pathToDungeonHeart() {
@@ -118,6 +144,72 @@ export class Hero extends Entity {
       }
     }
     return null;
+  }
+
+  /** Pick the adjacent wall tile closest to the dungeon heart center. */
+  _pickDigTarget() {
+    const heartCx = Math.floor(this._world.width / 2);
+    const heartCy = Math.floor(this._world.height / 2);
+    const { tx, ty } = this.getTile(TILE_SIZE);
+    const neighbors = [
+      { x: tx - 1, y: ty },
+      { x: tx + 1, y: ty },
+      { x: tx, y: ty - 1 },
+      { x: tx, y: ty + 1 },
+    ];
+
+    let best = null;
+    let bestDist = Infinity;
+    for (const n of neighbors) {
+      if (!this._world.isInBounds(n.x, n.y)) continue;
+      if (this._world.isWalkable(n.x, n.y)) continue; // skip already walkable
+      const tile = this._world.getTile(n.x, n.y);
+      if (tile === TILE_TYPES.LAVA || tile === TILE_TYPES.WATER || tile === TILE_TYPES.ROCK) continue;
+      const dist = Math.abs(n.x - heartCx) + Math.abs(n.y - heartCy);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = n;
+      }
+    }
+    if (best) {
+      this._digTargetX = best.x;
+      this._digTargetY = best.y;
+      this._digTimer = 0;
+    }
+  }
+
+  /** Process one tick of wall-digging. */
+  _updateDigging(dt) {
+    if (this._digTargetX < 0) {
+      this._pickDigTarget();
+      if (this._digTargetX < 0) {
+        // No diggable neighbor — try re-pathing
+        this._repath();
+        return;
+      }
+    }
+
+    this._digTimer += dt;
+    if (this._digTimer >= WAVE.HERO_DIG_TIME_SEC) {
+      // Dig the tile
+      this._world.setTile(this._digTargetX, this._digTargetY, TILE_TYPES.UNCLAIMED_FLOOR);
+      this._eventBus.publish(EVENTS.TILE_CHANGED, {
+        x: this._digTargetX,
+        y: this._digTargetY,
+        type: TILE_TYPES.UNCLAIMED_FLOOR,
+      });
+      Pathfinder.clearCache();
+
+      // Move hero to the newly dug tile
+      this.x = this._digTargetX * TILE_SIZE + TILE_SIZE / 2;
+      this.y = this._digTargetY * TILE_SIZE + TILE_SIZE / 2;
+
+      // Reset and try to repath
+      this._digTimer = 0;
+      this._digTargetX = -1;
+      this._digTargetY = -1;
+      this._repath();
+    }
   }
 
   get facingRight() { return this._facingRight; }

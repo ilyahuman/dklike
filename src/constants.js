@@ -199,6 +199,7 @@ export const WAVE = Object.freeze({
   WIZARD_PER_WAVE: 0.3,
   REPATH_INTERVAL_SEC: 3,
   TOTAL_WAVES: 10,
+  HERO_DIG_TIME_SEC: 4,
 });
 
 // ── Combat ───────────────────────────────────────────
