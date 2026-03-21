@@ -9,12 +9,13 @@ export class ResourceManager {
   /** @param {import('../core/EventBus.js').EventBus} eventBus */
   constructor(eventBus) {
     this._eventBus = eventBus;
-    this._gold = 0;
-    this._mana = 0;
+    this._gold = RESOURCES.STARTING_GOLD;
+    this._mana = RESOURCES.STARTING_MANA;
     this._goldCap = RESOURCES.GOLD_BASE_CAP;
     this._manaCap = RESOURCES.MANA_CAP;
     this._heartHP = DUNGEON_HEART_HP;
     this._heartMaxHP = DUNGEON_HEART_HP;
+    this._publish();
   }
 
   get gold() { return this._gold; }

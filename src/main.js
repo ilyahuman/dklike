@@ -462,7 +462,7 @@ eventBus.subscribe(EVENTS.ENTITY_DIED, (e) => {
 });
 
 // Track gold earned via RESOURCES_CHANGED delta
-let lastGold = 0;
+let lastGold = RESOURCES.STARTING_GOLD;
 eventBus.subscribe(EVENTS.RESOURCES_CHANGED, (data) => {
   if (data.gold > lastGold) {
     gameStateManager.addStat('goldEarned', data.gold - lastGold);

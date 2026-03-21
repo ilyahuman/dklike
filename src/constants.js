@@ -114,6 +114,8 @@ export const RESOURCES = Object.freeze({
   MANA_REGEN_PER_SEC: 2,
   GOLD_VEIN_YIELD: 200,
   GEM_SEAM_GOLD_PER_SEC: 5,
+  STARTING_GOLD: 500,
+  STARTING_MANA: 200,
 });
 
 // ── Creature Stats ───────────────────────────────────

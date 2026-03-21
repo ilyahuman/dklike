@@ -4,38 +4,50 @@ import { EventBus } from '../../src/core/EventBus.js';
 import { RESOURCES, EVENTS, DUNGEON_HEART_HP } from '../../src/constants.js';
 
 describe('ResourceManager', () => {
-  it('starts with zero gold and zero mana', () => {
+  it('starts with STARTING_GOLD and STARTING_MANA', () => {
     const rm = new ResourceManager(new EventBus());
-    expect(rm.gold).toBe(0);
-    expect(rm.mana).toBe(0);
+    expect(rm.gold).toBe(RESOURCES.STARTING_GOLD);
+    expect(rm.mana).toBe(RESOURCES.STARTING_MANA);
+  });
+
+  it('publishes RESOURCES_CHANGED on construction', () => {
+    const eventBus = new EventBus();
+    const spy = vi.fn();
+    eventBus.subscribe(EVENTS.RESOURCES_CHANGED, spy);
+    const rm = new ResourceManager(eventBus);
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({
+      gold: RESOURCES.STARTING_GOLD,
+      mana: RESOURCES.STARTING_MANA,
+    }));
   });
 
   it('earnGold adds gold up to cap', () => {
     const rm = new ResourceManager(new EventBus());
-    rm.earnGold(500);
-    expect(rm.gold).toBe(500);
+    rm.earnGold(300);
+    expect(rm.gold).toBe(RESOURCES.STARTING_GOLD + 300);
     rm.earnGold(800);
     expect(rm.gold).toBe(RESOURCES.GOLD_BASE_CAP);
   });
 
   it('spendGold deducts gold and returns true', () => {
     const rm = new ResourceManager(new EventBus());
-    rm.earnGold(500);
-    expect(rm.spendGold(200)).toBe(true);
-    expect(rm.gold).toBe(300);
+    rm.earnGold(200);
+    expect(rm.spendGold(300)).toBe(true);
+    expect(rm.gold).toBe(RESOURCES.STARTING_GOLD + 200 - 300);
   });
 
   it('spendGold returns false if insufficient gold', () => {
     const rm = new ResourceManager(new EventBus());
     rm.earnGold(100);
-    expect(rm.spendGold(200)).toBe(false);
-    expect(rm.gold).toBe(100);
+    expect(rm.spendGold(RESOURCES.STARTING_GOLD + 200)).toBe(false);
+    expect(rm.gold).toBe(RESOURCES.STARTING_GOLD + 100);
   });
 
   it('mana regenerates via update(dt)', () => {
     const rm = new ResourceManager(new EventBus());
+    const before = rm.mana;
     rm.update(1.0);
-    expect(rm.mana).toBeCloseTo(RESOURCES.MANA_REGEN_PER_SEC);
+    expect(rm.mana).toBeCloseTo(before + RESOURCES.MANA_REGEN_PER_SEC);
   });
 
   it('mana clamped to MANA_CAP', () => {
@@ -57,7 +69,7 @@ describe('ResourceManager', () => {
     eventBus.subscribe(EVENTS.RESOURCES_CHANGED, spy);
     const rm = new ResourceManager(eventBus);
     rm.earnGold(100);
-    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ gold: 100 }));
+    expect(spy).toHaveBeenCalledWith(expect.objectContaining({ gold: RESOURCES.STARTING_GOLD + 100 }));
   });
 
   it('spendMana deducts mana and returns true', () => {
@@ -70,8 +82,8 @@ describe('ResourceManager', () => {
 
   it('spendMana returns false if insufficient', () => {
     const rm = new ResourceManager(new EventBus());
-    expect(rm.spendMana(100)).toBe(false);
-    expect(rm.mana).toBe(0);
+    expect(rm.spendMana(RESOURCES.STARTING_MANA + 100)).toBe(false);
+    expect(rm.mana).toBe(RESOURCES.STARTING_MANA);
   });
 
   it('getSnapshot returns current state', () => {
@@ -79,8 +91,8 @@ describe('ResourceManager', () => {
     rm.earnGold(300);
     rm.update(1.0);
     const snap = rm.getSnapshot();
-    expect(snap.gold).toBe(300);
-    expect(snap.mana).toBeCloseTo(RESOURCES.MANA_REGEN_PER_SEC);
+    expect(snap.gold).toBe(RESOURCES.STARTING_GOLD + 300);
+    expect(snap.mana).toBeCloseTo(RESOURCES.STARTING_MANA + RESOURCES.MANA_REGEN_PER_SEC);
     expect(snap.goldCap).toBe(RESOURCES.GOLD_BASE_CAP);
     expect(snap.manaCap).toBe(RESOURCES.MANA_CAP);
   });
