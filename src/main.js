@@ -274,6 +274,14 @@ eventBus.subscribe(EVENTS.INPUT_MOUSE_UP, () => {
   dragDiggedTiles.clear();
 });
 
+// Right-click to cancel dig marks
+eventBus.subscribe(EVENTS.INPUT_RIGHT_CLICK, (e) => {
+  if (gameStateManager.state !== GAME_STATES.PLAYING) return;
+  if (jobQueue.isDigQueued(e.tileX, e.tileY)) {
+    jobQueue.cancelDigJob(e.tileX, e.tileY);
+  }
+});
+
 // Key handling for room placement confirm/cancel + possess ESC
 eventBus.subscribe(EVENTS.INPUT_KEY_DOWN, (e) => {
   // Pause toggle (P key or Escape, only when NOT possessing)
@@ -310,9 +318,6 @@ eventBus.subscribe(EVENTS.INPUT_KEY_DOWN, (e) => {
         tiles.push({ x, y });
       }
     }
-
-    // Validate min tiles
-    if (tiles.length < config.minTiles) return;
 
     // Validate cost
     const cost = tiles.length * config.goldPerTile;

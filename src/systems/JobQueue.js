@@ -39,6 +39,19 @@ export class JobQueue {
   }
 
   /**
+   * Cancel a dig job at tile position (player unmarked it).
+   * @param {number} x
+   * @param {number} y
+   */
+  cancelDigJob(x, y) {
+    const idx = this._digJobs.findIndex(j => j.x === x && j.y === y);
+    if (idx !== -1) {
+      this._digJobs.splice(idx, 1);
+      this._eventBus.publish(EVENTS.JOB_UPDATED, { type: 'dig', x, y, action: 'cancelled' });
+    }
+  }
+
+  /**
    * Mark a dig job as complete and remove it.
    * @param {number} x
    * @param {number} y
