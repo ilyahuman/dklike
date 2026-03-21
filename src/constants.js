@@ -281,6 +281,8 @@ export const EVENTS = Object.freeze({
   INPUT_KEY_UP: 'input:key_up',
   INPUT_MOUSE_MOVE: 'input:mouse_move',
   INPUT_SCROLL: 'input:scroll',
+  INPUT_DRAG: 'input:drag',
+  INPUT_MOUSE_UP: 'input:mouse_up',
   CAMERA_MOVED: 'camera:moved',
   SPEED_CHANGED: 'speed:changed',
   TOOL_SELECTED: 'tool:selected',

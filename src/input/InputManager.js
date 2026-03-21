@@ -19,6 +19,9 @@ export class InputManager {
     this._middleMouseDown = false;
     this._lastMouseX = 0;
     this._lastMouseY = 0;
+    this._leftMouseDown = false;
+    this._lastDragTileX = -1;
+    this._lastDragTileY = -1;
 
     this._bindEvents();
   }
@@ -61,9 +64,29 @@ export class InputManager {
         worldX: wx, worldY: wy,
         tileX: Math.floor(wx / TILE_SIZE), tileY: Math.floor(wy / TILE_SIZE),
       });
+
+      // Drag-to-dig: publish INPUT_DRAG when left button held and tile changes
+      if (this._leftMouseDown) {
+        const dragTileX = Math.floor(wx / TILE_SIZE);
+        const dragTileY = Math.floor(wy / TILE_SIZE);
+        if (dragTileX !== this._lastDragTileX || dragTileY !== this._lastDragTileY) {
+          this._lastDragTileX = dragTileX;
+          this._lastDragTileY = dragTileY;
+          this._eventBus.publish(EVENTS.INPUT_DRAG, {
+            screenX: e.clientX, screenY: e.clientY,
+            worldX: wx, worldY: wy,
+            tileX: dragTileX, tileY: dragTileY,
+          });
+        }
+      }
     });
 
     this._canvas.addEventListener('mousedown', (e) => {
+      if (e.button === 0) {
+        this._leftMouseDown = true;
+        this._lastDragTileX = -1;
+        this._lastDragTileY = -1;
+      }
       if (e.button === 1) {
         this._middleMouseDown = true;
         this._lastMouseX = e.clientX;
@@ -73,6 +96,10 @@ export class InputManager {
     });
 
     window.addEventListener('mouseup', (e) => {
+      if (e.button === 0) {
+        this._leftMouseDown = false;
+        this._eventBus.publish(EVENTS.INPUT_MOUSE_UP, {});
+      }
       if (e.button === 1) {
         this._middleMouseDown = false;
       }
