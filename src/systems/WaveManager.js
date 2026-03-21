@@ -77,31 +77,17 @@ export class WaveManager {
   }
 
   _findSpawnPoint() {
-    const edge = Math.floor(Math.random() * 4);
     const w = this._world.width;
     const h = this._world.height;
-    let targetX, targetY;
+    const edge = Math.floor(Math.random() * 4);
 
+    let x, y;
     switch (edge) {
-      case 0: targetX = Math.floor(Math.random() * w); targetY = 0; break;
-      case 1: targetX = Math.floor(Math.random() * w); targetY = h - 1; break;
-      case 2: targetX = 0; targetY = Math.floor(Math.random() * h); break;
-      default: targetX = w - 1; targetY = Math.floor(Math.random() * h); break;
+      case 0: x = Math.floor(Math.random() * w); y = 0; break;        // top
+      case 1: x = Math.floor(Math.random() * w); y = h - 1; break;    // bottom
+      case 2: x = 0; y = Math.floor(Math.random() * h); break;        // left
+      default: x = w - 1; y = Math.floor(Math.random() * h); break;   // right
     }
-
-    let bestTile = null;
-    let bestDist = Infinity;
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        if (this._world.isWalkable(x, y)) {
-          const dist = Math.abs(x - targetX) + Math.abs(y - targetY);
-          if (dist < bestDist) {
-            bestDist = dist;
-            bestTile = { x, y };
-          }
-        }
-      }
-    }
-    return bestTile;
+    return { x, y };
   }
 }

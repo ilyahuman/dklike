@@ -4,7 +4,7 @@ import { World } from '../../src/world/World.js';
 import { EntityManager } from '../../src/entities/EntityManager.js';
 import { EventBus } from '../../src/core/EventBus.js';
 import { RoomManager } from '../../src/systems/RoomManager.js';
-import { TILE_TYPES, ENTITY_TYPES, EVENTS, WAVE } from '../../src/constants.js';
+import { TILE_TYPES, ENTITY_TYPES, EVENTS, WAVE, TILE_SIZE } from '../../src/constants.js';
 
 function makeWorld() {
   const world = new World();
@@ -86,6 +86,22 @@ describe('WaveManager', () => {
       ...entityManager.getByType(ENTITY_TYPES.WIZARD),
     ];
     expect(heroes.length).toBeGreaterThan(0);
+  });
+
+  it('spawns heroes at map edge tiles', () => {
+    waveManager.update(WAVE.INTERVAL_SEC);
+    const heroes = [
+      ...entityManager.getByType(ENTITY_TYPES.KNIGHT),
+      ...entityManager.getByType(ENTITY_TYPES.THIEF),
+      ...entityManager.getByType(ENTITY_TYPES.WIZARD),
+    ];
+    expect(heroes.length).toBeGreaterThan(0);
+    for (const hero of heroes) {
+      const tx = Math.floor(hero.x / TILE_SIZE);
+      const ty = Math.floor(hero.y / TILE_SIZE);
+      const onEdge = tx <= 1 || ty <= 1 || tx >= world.width - 2 || ty >= world.height - 2;
+      expect(onEdge).toBe(true);
+    }
   });
 
   it('publishes WAVE_COMPLETED when all heroes die', () => {
