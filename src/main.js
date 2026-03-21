@@ -171,7 +171,11 @@ eventBus.subscribe(EVENTS.SPEED_CHANGED, (e) => {
 eventBus.subscribe(EVENTS.INPUT_MOUSE_MOVE, (e) => {
   hoverTileX = e.tileX;
   hoverTileY = e.tileY;
-  tooltip.show(e.screenX, e.screenY, e.worldX, e.worldY);
+  if (gameStateManager.state === GAME_STATES.PLAYING) {
+    tooltip.show(e.screenX, e.screenY, e.worldX, e.worldY);
+  } else {
+    tooltip.hide();
+  }
 });
 
 // Click handling
@@ -442,13 +446,13 @@ eventBus.subscribe(EVENTS.GAME_OVER, (e) => {
   setTimeout(() => {
     gameLoop.pause();
     gameLoop.setSpeed(1); // Reset speed for when they restart
-    menuScreen.showGameOver(e.stats);
+    menuScreen.showGameOver({ ...e.stats, elapsedTime: e.elapsedTime });
   }, 1000);
 });
 
 eventBus.subscribe(EVENTS.GAME_VICTORY, (e) => {
   gameLoop.pause();
-  menuScreen.showVictory(e.stats);
+  menuScreen.showVictory({ ...e.stats, elapsedTime: e.elapsedTime });
 });
 
 // Track stats for game session
