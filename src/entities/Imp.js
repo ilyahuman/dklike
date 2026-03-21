@@ -87,19 +87,18 @@ export class Imp extends Entity {
   _decideAction() {
     // Try to claim a dig job (only if energy above threshold)
     if (this.energy > IMP_STATS.energyThreshold && !this._currentJob) {
-      const job = this._jobQueue.claimDigJob(this.id);
-      if (job) {
+      const pending = this._jobQueue.getPendingDigJobs();
+      for (const job of pending) {
+        job.assignedTo = this.id;
         this._currentJob = job;
-        // Dig target is not walkable, so path to an adjacent walkable tile
         this._pathToAdjacentWalkable(job.x, job.y);
-        if (!this._path) {
-          // Can't reach -- release job
-          this._jobQueue.releaseJob(this.id);
-          this._currentJob = null;
-        } else {
+        if (this._path) {
           this._moveGoal = 'dig';
           return;
         }
+        // Can't reach this job — release and try next
+        job.assignedTo = null;
+        this._currentJob = null;
       }
     }
 
