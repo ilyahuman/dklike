@@ -244,15 +244,11 @@ eventBus.subscribe(EVENTS.INPUT_CLICK, (e) => {
   }
 
   if (activeTool === 'dig') {
-    // Dig mode
+    // Dig mode — mark any diggable tile, imps will path to reachable ones
     const { tileX, tileY } = e;
     if (world.isDiggable(tileX, tileY)) {
-      const neighbors = world.getNeighbors(tileX, tileY);
-      const hasWalkableNeighbor = neighbors.some(n => world.isWalkable(n.x, n.y));
-      if (hasWalkableNeighbor) {
-        jobQueue.addDigJob(tileX, tileY);
-        Pathfinder.clearCache();
-      }
+      jobQueue.addDigJob(tileX, tileY);
+      Pathfinder.clearCache();
     }
   }
 });
@@ -267,13 +263,9 @@ eventBus.subscribe(EVENTS.INPUT_DRAG, (e) => {
   if (dragDiggedTiles.has(key)) return;
 
   if (world.isDiggable(e.tileX, e.tileY)) {
-    const neighbors = world.getNeighbors(e.tileX, e.tileY);
-    const hasWalkableNeighbor = neighbors.some(n => world.isWalkable(n.x, n.y));
-    if (hasWalkableNeighbor) {
-      jobQueue.addDigJob(e.tileX, e.tileY);
-      Pathfinder.clearCache();
-      dragDiggedTiles.add(key);
-    }
+    jobQueue.addDigJob(e.tileX, e.tileY);
+    Pathfinder.clearCache();
+    dragDiggedTiles.add(key);
   }
 });
 
