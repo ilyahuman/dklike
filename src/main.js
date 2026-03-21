@@ -107,6 +107,8 @@ let activeTool = 'dig';
 const pendingRoomTiles = new Set();
 let hoverTileX = -1;
 let hoverTileY = -1;
+/** @type {Set<string>} tiles marked during current drag session */
+const dragDiggedTiles = new Set();
 
 // Placement info overlay
 const placementInfoEl = document.createElement('div');
@@ -253,6 +255,31 @@ eventBus.subscribe(EVENTS.INPUT_CLICK, (e) => {
       }
     }
   }
+});
+
+// Drag-to-dig: mark tiles while left mouse held
+eventBus.subscribe(EVENTS.INPUT_DRAG, (e) => {
+  if (activeTool !== 'dig') return;
+  if (spellSystem.isPossessing) return;
+  if (gameStateManager.state !== GAME_STATES.PLAYING) return;
+
+  const key = `${e.tileX},${e.tileY}`;
+  if (dragDiggedTiles.has(key)) return;
+
+  if (world.isDiggable(e.tileX, e.tileY)) {
+    const neighbors = world.getNeighbors(e.tileX, e.tileY);
+    const hasWalkableNeighbor = neighbors.some(n => world.isWalkable(n.x, n.y));
+    if (hasWalkableNeighbor) {
+      jobQueue.addDigJob(e.tileX, e.tileY);
+      Pathfinder.clearCache();
+      dragDiggedTiles.add(key);
+    }
+  }
+});
+
+// Clear drag session on mouse up
+eventBus.subscribe(EVENTS.INPUT_MOUSE_UP, () => {
+  dragDiggedTiles.clear();
 });
 
 // Key handling for room placement confirm/cancel + possess ESC
