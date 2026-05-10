@@ -1,0 +1,1804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DKLike — Algorithm Visualizations</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=MedievalSharp&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #0a0a08;
+    color: #c0b090;
+    font-family: 'Inter', sans-serif;
+    min-height: 100vh;
+  }
+
+  header {
+    text-align: center;
+    padding: 32px 16px 16px;
+    background: radial-gradient(ellipse at center, #1a1510 0%, #0a0a08 70%);
+    border-bottom: 1px solid #2a2218;
+  }
+
+  header h1 {
+    font-family: 'MedievalSharp', cursive;
+    font-size: 42px;
+    color: #c0a060;
+    text-shadow: 0 0 20px rgba(192,160,96,0.3);
+    margin-bottom: 8px;
+  }
+
+  header p { color: #706050; font-size: 14px; }
+
+  nav {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+    padding: 16px;
+    background: #0e0d0a;
+    border-bottom: 1px solid #2a2218;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+
+  nav button {
+    font-family: 'MedievalSharp', cursive;
+    font-size: 15px;
+    color: #a09070;
+    background: linear-gradient(180deg, #1e1c16 0%, #161410 100%);
+    border: 1px solid #3a3228;
+    border-radius: 4px;
+    padding: 8px 18px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  nav button:hover { border-color: #6a5a45; color: #c0a060; }
+  nav button.active {
+    border-color: #c0a060;
+    color: #f0d080;
+    background: linear-gradient(180deg, #2a2418 0%, #1e1a14 100%);
+    box-shadow: 0 0 8px rgba(192,160,96,0.15);
+  }
+
+  .viz-section {
+    display: none;
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 24px 16px;
+  }
+
+  .viz-section.active { display: block; }
+
+  .viz-section h2 {
+    font-family: 'MedievalSharp', cursive;
+    font-size: 28px;
+    color: #c0a060;
+    margin-bottom: 8px;
+  }
+
+  .viz-section .desc {
+    color: #807060;
+    font-size: 13px;
+    line-height: 1.6;
+    margin-bottom: 16px;
+    max-width: 700px;
+  }
+
+  canvas {
+    display: block;
+    background: #12110e;
+    border: 1px solid #2a2218;
+    border-radius: 6px;
+    margin-bottom: 12px;
+  }
+
+  .controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .controls button {
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    color: #c0a060;
+    background: #1e1c16;
+    border: 1px solid #3a3228;
+    border-radius: 4px;
+    padding: 6px 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .controls button:hover { border-color: #c0a060; }
+  .controls button.active-btn { background: #2a2418; border-color: #c0a060; }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    font-size: 12px;
+    color: #807060;
+    margin-bottom: 12px;
+  }
+
+  .legend span {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .legend .swatch {
+    width: 12px;
+    height: 12px;
+    border-radius: 2px;
+    display: inline-block;
+  }
+
+  .info-box {
+    background: rgba(30,25,20,0.6);
+    border: 1px solid #2a2218;
+    border-radius: 4px;
+    padding: 12px 16px;
+    font-size: 12px;
+    color: #907860;
+    line-height: 1.6;
+    margin-top: 8px;
+  }
+
+  .info-box code {
+    color: #c0a060;
+    background: rgba(192,160,96,0.1);
+    padding: 1px 4px;
+    border-radius: 2px;
+    font-size: 11px;
+  }
+
+  .stat-line {
+    font-size: 13px;
+    color: #a09070;
+    margin-top: 8px;
+  }
+
+  .stat-line strong { color: #c0a060; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>DKLike Algorithm Visualizations</h1>
+  <p>Interactive visualizations of the algorithms and patterns powering the game</p>
+</header>
+
+<nav id="nav"></nav>
+
+<div id="sections"></div>
+
+<script>
+// ─── TABBING ──────────────────────────────────────────
+const vizDefs = [
+  { id: 'astar',      label: 'A* Pathfinding' },
+  { id: 'spatial',    label: 'Spatial Hash' },
+  { id: 'gameloop',   label: 'Game Loop' },
+  { id: 'statemachine', label: 'State Machine' },
+  { id: 'eventbus',   label: 'Event Bus' },
+  { id: 'creatureai', label: 'Creature AI' },
+  { id: 'particles',  label: 'Particle Pool' },
+  { id: 'combat',     label: 'Combat Tick' },
+];
+
+const nav = document.getElementById('nav');
+const sectionsEl = document.getElementById('sections');
+
+vizDefs.forEach(v => {
+  const btn = document.createElement('button');
+  btn.textContent = v.label;
+  btn.dataset.id = v.id;
+  btn.addEventListener('click', () => switchTab(v.id));
+  nav.appendChild(btn);
+
+  const sec = document.createElement('div');
+  sec.id = `viz-${v.id}`;
+  sec.className = 'viz-section';
+  sectionsEl.appendChild(sec);
+});
+
+let activeViz = null;
+let cleanupFns = {};
+
+function switchTab(id) {
+  if (activeViz && cleanupFns[activeViz]) cleanupFns[activeViz]();
+  nav.querySelectorAll('button').forEach(b => b.classList.toggle('active', b.dataset.id === id));
+  document.querySelectorAll('.viz-section').forEach(s => s.classList.toggle('active', s.id === `viz-${id}`));
+  activeViz = id;
+  vizInits[id]?.();
+}
+
+const vizInits = {};
+
+// ─── HELPERS ──────────────────────────────────────────
+function makeCanvas(parent, w, h) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  c.style.width = w + 'px'; c.style.height = h + 'px';
+  parent.appendChild(c);
+  return [c, c.getContext('2d')];
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 1. A* PATHFINDING
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+vizInits.astar = () => {
+  const el = document.getElementById('viz-astar');
+  el.innerHTML = '';
+
+  el.innerHTML = `
+    <h2>A* Pathfinding</h2>
+    <p class="desc">Click to place/remove walls. The algorithm finds the shortest path using an octile distance heuristic
+    with 8-directional movement. Watch the open set (frontier) expand and the closed set (explored) fill in.</p>
+    <div class="controls" id="astar-controls">
+      <button id="astar-run">Run A*</button>
+      <button id="astar-step">Step</button>
+      <button id="astar-reset">Reset</button>
+      <button id="astar-clear">Clear Walls</button>
+      <button id="astar-maze">Random Maze</button>
+    </div>
+    <div class="legend">
+      <span><span class="swatch" style="background:#2a6a2a"></span> Start</span>
+      <span><span class="swatch" style="background:#8a2a2a"></span> End</span>
+      <span><span class="swatch" style="background:#4a4a4a"></span> Wall</span>
+      <span><span class="swatch" style="background:#2a4a6a"></span> Open Set</span>
+      <span><span class="swatch" style="background:#1a2a3a"></span> Closed Set</span>
+      <span><span class="swatch" style="background:#c0a060"></span> Path</span>
+    </div>
+  `;
+
+  const COLS = 35, ROWS = 20, CELL = 24;
+  const [canvas, ctx] = makeCanvas(el, COLS * CELL, ROWS * CELL);
+  const statEl = document.createElement('div');
+  statEl.className = 'stat-line';
+  el.appendChild(statEl);
+
+  const infoEl = document.createElement('div');
+  infoEl.className = 'info-box';
+  infoEl.innerHTML = `
+    <strong>How A* works:</strong> It maintains an <code>open set</code> (frontier nodes to explore) and a <code>closed set</code> (already explored).
+    Each step, it picks the node with lowest <code>f = g + h</code> where <code>g</code> = cost from start, <code>h</code> = heuristic estimate to goal.
+    The <strong>octile heuristic</strong> accounts for diagonal moves costing &radic;2. Corner-cutting is disabled &mdash; diagonal moves require both adjacent cardinals to be walkable.
+  `;
+  el.appendChild(infoEl);
+
+  let walls = new Set();
+  let start = { x: 3, y: 10 };
+  let end = { x: 31, y: 10 };
+  let openSet = [], closedSet = new Set(), cameFrom = {}, gScore = {}, path = [];
+  let running = false, done = false, animId = null;
+
+  function key(x, y) { return `${x},${y}`; }
+
+  function octile(ax, ay, bx, by) {
+    const dx = Math.abs(ax - bx), dy = Math.abs(ay - by);
+    return Math.max(dx, dy) + (Math.SQRT2 - 1) * Math.min(dx, dy);
+  }
+
+  function neighbors(x, y) {
+    const dirs = [[-1,0],[1,0],[0,-1],[0,1],[-1,-1],[-1,1],[1,-1],[1,1]];
+    const res = [];
+    for (const [dx, dy] of dirs) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || nx >= COLS || ny < 0 || ny >= ROWS) continue;
+      if (walls.has(key(nx, ny))) continue;
+      if (dx !== 0 && dy !== 0) {
+        if (walls.has(key(x + dx, y)) || walls.has(key(x, y + dy))) continue;
+      }
+      res.push({ x: nx, y: ny, cost: (dx !== 0 && dy !== 0) ? Math.SQRT2 : 1 });
+    }
+    return res;
+  }
+
+  function initAStar() {
+    openSet = [{ x: start.x, y: start.y }];
+    closedSet = new Set();
+    cameFrom = {};
+    gScore = {};
+    gScore[key(start.x, start.y)] = 0;
+    path = [];
+    done = false;
+  }
+
+  function stepAStar() {
+    if (done || openSet.length === 0) { done = true; return; }
+
+    openSet.sort((a, b) => {
+      const fa = (gScore[key(a.x, a.y)] || Infinity) + octile(a.x, a.y, end.x, end.y);
+      const fb = (gScore[key(b.x, b.y)] || Infinity) + octile(b.x, b.y, end.x, end.y);
+      return fa - fb;
+    });
+
+    const current = openSet.shift();
+    const ck = key(current.x, current.y);
+
+    if (current.x === end.x && current.y === end.y) {
+      // Reconstruct path
+      let k = ck;
+      while (k) { const [x, y] = k.split(',').map(Number); path.unshift({ x, y }); k = cameFrom[k]; }
+      done = true;
+      return;
+    }
+
+    closedSet.add(ck);
+
+    for (const n of neighbors(current.x, current.y)) {
+      const nk = key(n.x, n.y);
+      if (closedSet.has(nk)) continue;
+      const tentG = (gScore[ck] || 0) + n.cost;
+      if (tentG < (gScore[nk] ?? Infinity)) {
+        gScore[nk] = tentG;
+        cameFrom[nk] = ck;
+        if (!openSet.find(o => o.x === n.x && o.y === n.y)) {
+          openSet.push({ x: n.x, y: n.y });
+        }
+      }
+    }
+  }
+
+  function draw() {
+    ctx.fillStyle = '#12110e';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    for (let y = 0; y < ROWS; y++) {
+      for (let x = 0; x < COLS; x++) {
+        const k = key(x, y);
+        let color = '#1a1916';
+        if (walls.has(k)) color = '#4a4a4a';
+        else if (closedSet.has(k)) color = '#1a2a3a';
+        ctx.fillStyle = color;
+        ctx.fillRect(x * CELL + 1, y * CELL + 1, CELL - 2, CELL - 2);
+      }
+    }
+
+    // Open set
+    for (const o of openSet) {
+      ctx.fillStyle = '#2a4a6a';
+      ctx.fillRect(o.x * CELL + 1, o.y * CELL + 1, CELL - 2, CELL - 2);
+      // Show f-score
+      const f = (gScore[key(o.x, o.y)] || 0) + octile(o.x, o.y, end.x, end.y);
+      ctx.fillStyle = '#4a7aaa';
+      ctx.font = '8px Inter';
+      ctx.textAlign = 'center';
+      ctx.fillText(f.toFixed(1), o.x * CELL + CELL / 2, o.y * CELL + CELL / 2 + 3);
+    }
+
+    // Path
+    if (path.length > 0) {
+      ctx.strokeStyle = '#c0a060';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(path[0].x * CELL + CELL / 2, path[0].y * CELL + CELL / 2);
+      for (let i = 1; i < path.length; i++) {
+        ctx.lineTo(path[i].x * CELL + CELL / 2, path[i].y * CELL + CELL / 2);
+      }
+      ctx.stroke();
+      for (const p of path) {
+        ctx.fillStyle = 'rgba(192,160,96,0.3)';
+        ctx.fillRect(p.x * CELL + 1, p.y * CELL + 1, CELL - 2, CELL - 2);
+      }
+    }
+
+    // Start/end
+    ctx.fillStyle = '#2a8a2a';
+    ctx.fillRect(start.x * CELL + 3, start.y * CELL + 3, CELL - 6, CELL - 6);
+    ctx.fillStyle = '#aa2a2a';
+    ctx.fillRect(end.x * CELL + 3, end.y * CELL + 3, CELL - 6, CELL - 6);
+
+    // Grid lines
+    ctx.strokeStyle = '#1e1d1a';
+    ctx.lineWidth = 0.5;
+    for (let x = 0; x <= COLS; x++) { ctx.beginPath(); ctx.moveTo(x * CELL, 0); ctx.lineTo(x * CELL, ROWS * CELL); ctx.stroke(); }
+    for (let y = 0; y <= ROWS; y++) { ctx.beginPath(); ctx.moveTo(0, y * CELL); ctx.lineTo(COLS * CELL, y * CELL); ctx.stroke(); }
+
+    statEl.innerHTML = `Open: <strong>${openSet.length}</strong> | Closed: <strong>${closedSet.size}</strong> | Path: <strong>${path.length}</strong>` +
+      (done && path.length === 0 && openSet.length === 0 ? ' | <strong style="color:#aa4040">No path found!</strong>' : '');
+  }
+
+  function runAnim() {
+    if (!running) return;
+    for (let i = 0; i < 3; i++) stepAStar();
+    draw();
+    if (!done) animId = requestAnimationFrame(runAnim);
+    else { running = false; draw(); }
+  }
+
+  canvas.addEventListener('click', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const x = Math.floor((e.clientX - rect.left) / CELL);
+    const y = Math.floor((e.clientY - rect.top) / CELL);
+    if (x === start.x && y === start.y) return;
+    if (x === end.x && y === end.y) return;
+    const k = key(x, y);
+    if (walls.has(k)) walls.delete(k); else walls.add(k);
+    initAStar();
+    draw();
+  });
+
+  document.getElementById('astar-run').addEventListener('click', () => {
+    if (running) return;
+    initAStar();
+    running = true;
+    runAnim();
+  });
+
+  document.getElementById('astar-step').addEventListener('click', () => {
+    if (running) return;
+    if (openSet.length === 0 && !done) initAStar();
+    stepAStar();
+    draw();
+  });
+
+  document.getElementById('astar-reset').addEventListener('click', () => {
+    running = false;
+    if (animId) cancelAnimationFrame(animId);
+    initAStar();
+    draw();
+  });
+
+  document.getElementById('astar-clear').addEventListener('click', () => {
+    running = false;
+    if (animId) cancelAnimationFrame(animId);
+    walls.clear();
+    initAStar();
+    draw();
+  });
+
+  document.getElementById('astar-maze').addEventListener('click', () => {
+    running = false;
+    if (animId) cancelAnimationFrame(animId);
+    walls.clear();
+    for (let y = 0; y < ROWS; y++) {
+      for (let x = 0; x < COLS; x++) {
+        if (Math.random() < 0.3) walls.add(key(x, y));
+      }
+    }
+    walls.delete(key(start.x, start.y));
+    walls.delete(key(end.x, end.y));
+    initAStar();
+    draw();
+  });
+
+  initAStar();
+  draw();
+
+  cleanupFns.astar = () => { running = false; if (animId) cancelAnimationFrame(animId); };
+};
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 2. SPATIAL HASH GRID
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+vizInits.spatial = () => {
+  const el = document.getElementById('viz-spatial');
+  el.innerHTML = `
+    <h2>Spatial Hash Grid</h2>
+    <p class="desc">Entities are bucketed into grid cells. Radius queries only check cells overlapping the circle,
+    turning O(n) brute-force into near-O(1). Click to set query center. Entities bounce around automatically.</p>
+    <div class="controls">
+      <button id="sh-toggle">Pause</button>
+      <button id="sh-add">Add 20 Entities</button>
+      <button id="sh-radius-up">Radius +</button>
+      <button id="sh-radius-down">Radius -</button>
+    </div>
+    <div class="legend">
+      <span><span class="swatch" style="background:#4a6a4a"></span> Entity</span>
+      <span><span class="swatch" style="background:#c0a060"></span> In Radius</span>
+      <span><span class="swatch" style="background:rgba(42,74,106,0.3)"></span> Checked Cells</span>
+      <span><span class="swatch" style="background:rgba(192,160,96,0.15)"></span> Query Circle</span>
+    </div>
+  `;
+
+  const W = 840, H = 480, CELL_SIZE = 120;
+  const [canvas, ctx] = makeCanvas(el, W, H);
+  const statEl = document.createElement('div');
+  statEl.className = 'stat-line';
+  el.appendChild(statEl);
+
+  const infoEl = document.createElement('div');
+  infoEl.className = 'info-box';
+  infoEl.innerHTML = `
+    <strong>How it works:</strong> The world is divided into cells of <code>128px</code> (4 tiles).
+    Each entity's position maps to a cell key via <code>(cellX &lt;&lt; 16) | (cellY &amp; 0xFFFF)</code>.
+    A radius query computes which cells overlap the circle, then only checks entities in those cells.
+    The grid rebuilds every frame (O(n)) but queries are O(k) where k = entities in overlapping cells.
+  `;
+  el.appendChild(infoEl);
+
+  let entities = [];
+  let queryX = W / 2, queryY = H / 2, queryRadius = 120;
+  let paused = false, animId = null;
+
+  function spawnEntities(n) {
+    for (let i = 0; i < n; i++) {
+      entities.push({
+        x: Math.random() * W, y: Math.random() * H,
+        vx: (Math.random() - 0.5) * 80, vy: (Math.random() - 0.5) * 80,
+      });
+    }
+  }
+  spawnEntities(40);
+
+  function getCellKey(x, y) {
+    return `${Math.floor(x / CELL_SIZE)},${Math.floor(y / CELL_SIZE)}`;
+  }
+
+  function draw() {
+    ctx.fillStyle = '#12110e';
+    ctx.fillRect(0, 0, W, H);
+
+    // Grid lines
+    ctx.strokeStyle = '#1e1d1a';
+    ctx.lineWidth = 1;
+    for (let x = 0; x <= W; x += CELL_SIZE) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); }
+    for (let y = 0; y <= H; y += CELL_SIZE) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); }
+
+    // Cell labels
+    ctx.font = '10px Inter';
+    ctx.fillStyle = '#2a2820';
+    ctx.textAlign = 'left';
+    for (let cx = 0; cx < Math.ceil(W / CELL_SIZE); cx++) {
+      for (let cy = 0; cy < Math.ceil(H / CELL_SIZE); cy++) {
+        ctx.fillText(`(${cx},${cy})`, cx * CELL_SIZE + 4, cy * CELL_SIZE + 14);
+      }
+    }
+
+    // Build hash
+    const grid = new Map();
+    for (const e of entities) {
+      const k = getCellKey(e.x, e.y);
+      if (!grid.has(k)) grid.set(k, []);
+      grid.get(k).push(e);
+    }
+
+    // Compute checked cells
+    const minCx = Math.floor((queryX - queryRadius) / CELL_SIZE);
+    const maxCx = Math.floor((queryX + queryRadius) / CELL_SIZE);
+    const minCy = Math.floor((queryY - queryRadius) / CELL_SIZE);
+    const maxCy = Math.floor((queryY + queryRadius) / CELL_SIZE);
+    const checkedCells = new Set();
+    const inRadius = new Set();
+    let cellsChecked = 0, entitiesChecked = 0;
+
+    for (let cx = minCx; cx <= maxCx; cx++) {
+      for (let cy = minCy; cy <= maxCy; cy++) {
+        const k = `${cx},${cy}`;
+        checkedCells.add(k);
+        cellsChecked++;
+        const cell = grid.get(k);
+        if (!cell) continue;
+        for (const e of cell) {
+          entitiesChecked++;
+          const dx = e.x - queryX, dy = e.y - queryY;
+          if (dx * dx + dy * dy <= queryRadius * queryRadius) inRadius.add(e);
+        }
+      }
+    }
+
+    // Draw checked cells
+    for (const k of checkedCells) {
+      const [cx, cy] = k.split(',').map(Number);
+      ctx.fillStyle = 'rgba(42,74,106,0.25)';
+      ctx.fillRect(cx * CELL_SIZE, cy * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+      ctx.strokeStyle = 'rgba(42,74,106,0.5)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(cx * CELL_SIZE, cy * CELL_SIZE, CELL_SIZE, CELL_SIZE);
+    }
+
+    // Query circle
+    ctx.beginPath();
+    ctx.arc(queryX, queryY, queryRadius, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(192,160,96,0.08)';
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(192,160,96,0.4)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Draw entities
+    for (const e of entities) {
+      const hit = inRadius.has(e);
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, hit ? 6 : 4, 0, Math.PI * 2);
+      ctx.fillStyle = hit ? '#c0a060' : '#4a6a4a';
+      ctx.fill();
+      if (hit) {
+        ctx.strokeStyle = 'rgba(192,160,96,0.5)';
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+    }
+
+    // Query center crosshair
+    ctx.strokeStyle = '#c0a060';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(queryX - 8, queryY); ctx.lineTo(queryX + 8, queryY);
+    ctx.moveTo(queryX, queryY - 8); ctx.lineTo(queryX, queryY + 8);
+    ctx.stroke();
+
+    statEl.innerHTML = `Entities: <strong>${entities.length}</strong> | Cells checked: <strong>${cellsChecked}</strong> / ${Math.ceil(W/CELL_SIZE) * Math.ceil(H/CELL_SIZE)} | Entities in checked cells: <strong>${entitiesChecked}</strong> | Found in radius: <strong>${inRadius.size}</strong>`;
+  }
+
+  let lastTime = performance.now();
+  function tick() {
+    const now = performance.now();
+    const dt = (now - lastTime) / 1000;
+    lastTime = now;
+
+    if (!paused) {
+      for (const e of entities) {
+        e.x += e.vx * dt;
+        e.y += e.vy * dt;
+        if (e.x < 0 || e.x > W) e.vx *= -1;
+        if (e.y < 0 || e.y > H) e.vy *= -1;
+        e.x = Math.max(0, Math.min(W, e.x));
+        e.y = Math.max(0, Math.min(H, e.y));
+      }
+    }
+    draw();
+    animId = requestAnimationFrame(tick);
+  }
+
+  canvas.addEventListener('click', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    queryX = e.clientX - rect.left;
+    queryY = e.clientY - rect.top;
+  });
+
+  document.getElementById('sh-toggle').addEventListener('click', function() {
+    paused = !paused;
+    this.textContent = paused ? 'Resume' : 'Pause';
+  });
+  document.getElementById('sh-add').addEventListener('click', () => spawnEntities(20));
+  document.getElementById('sh-radius-up').addEventListener('click', () => { queryRadius = Math.min(300, queryRadius + 20); });
+  document.getElementById('sh-radius-down').addEventListener('click', () => { queryRadius = Math.max(20, queryRadius - 20); });
+
+  tick();
+  cleanupFns.spatial = () => { if (animId) cancelAnimationFrame(animId); };
+};
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 3. GAME LOOP
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+vizInits.gameloop = () => {
+  const el = document.getElementById('viz-gameloop');
+  el.innerHTML = `
+    <h2>Fixed-Timestep Game Loop</h2>
+    <p class="desc">The accumulator collects real elapsed time. Fixed-step updates (16.67ms each) drain it.
+    Rendering happens every frame with interpolation alpha for smooth visuals between physics steps.</p>
+    <div class="controls">
+      <button id="gl-speed1">1x Speed</button>
+      <button id="gl-speed2">2x Speed</button>
+      <button id="gl-pause">Pause</button>
+      <button id="gl-slow">Slow CPU (40fps)</button>
+    </div>
+  `;
+
+  const W = 840, H = 400;
+  const [canvas, ctx] = makeCanvas(el, W, H);
+
+  const infoEl = document.createElement('div');
+  infoEl.className = 'info-box';
+  infoEl.innerHTML = `
+    <strong>Why fixed timestep?</strong> Physics needs deterministic updates (same result regardless of framerate).
+    The <code>accumulator</code> pattern decouples update rate (60 UPS) from display rate (variable FPS).
+    The <code>alpha</code> value (<code>accumulator / timestep</code>) lets rendering interpolate between states for silky-smooth visuals.
+    A <code>frame skip cap</code> prevents the "spiral of death" when the CPU can't keep up.
+  `;
+  el.appendChild(infoEl);
+
+  const TIMESTEP = 16.667;
+  const MAX_SKIP = 5;
+  let accumulator = 0;
+  let speed = 1;
+  let paused = false;
+  let simFps = 60;
+  let animId = null;
+  let updateCount = 0;
+  let frameCount = 0;
+  let lastSec = performance.now();
+  let displayFps = 0;
+  let displayUps = 0;
+  let history = []; // { time, accBefore, accAfter, updates, alpha }
+
+  let ballX = 100, ballY = 200, ballVX = 120, ballVY = 80;
+  let prevBallX = ballX, prevBallY = ballY;
+
+  function updateSim() {
+    prevBallX = ballX;
+    prevBallY = ballY;
+    const dt = TIMESTEP / 1000;
+    ballX += ballVX * dt;
+    ballY += ballVY * dt;
+    if (ballX < 20 || ballX > 400) { ballVX *= -1; ballX = Math.max(20, Math.min(400, ballX)); }
+    if (ballY < 20 || ballY > 280) { ballVY *= -1; ballY = Math.max(20, Math.min(280, ballY)); }
+    updateCount++;
+  }
+
+  let lastTime = performance.now();
+  function tick() {
+    const now = performance.now();
+    let deltaMs = now - lastTime;
+    lastTime = now;
+
+    // Simulate slower CPU
+    if (simFps < 60) deltaMs = 1000 / simFps;
+
+    frameCount++;
+    if (now - lastSec >= 1000) {
+      displayFps = frameCount;
+      displayUps = updateCount;
+      frameCount = 0;
+      updateCount = 0;
+      lastSec = now;
+    }
+
+    const accBefore = accumulator;
+    let updates = 0;
+
+    if (!paused) {
+      accumulator += deltaMs * speed;
+      let steps = 0;
+      while (accumulator >= TIMESTEP && steps < MAX_SKIP) {
+        updateSim();
+        accumulator -= TIMESTEP;
+        steps++;
+        updates++;
+      }
+      if (steps >= MAX_SKIP) accumulator = 0;
+    }
+
+    const alpha = accumulator / TIMESTEP;
+
+    history.push({ time: now, accBefore, accAfter: accumulator, updates, alpha });
+    if (history.length > 120) history.shift();
+
+    // Draw
+    ctx.fillStyle = '#12110e';
+    ctx.fillRect(0, 0, W, H);
+
+    // ── Left: ball simulation ──
+    ctx.save();
+    ctx.strokeStyle = '#2a2820';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(20, 20, 380, 260);
+
+    ctx.fillStyle = '#1a1916';
+    ctx.font = '12px Inter';
+    ctx.fillText('Simulation Area', 24, 16);
+
+    // Interpolated ball
+    const drawX = prevBallX + (ballX - prevBallX) * alpha;
+    const drawY = prevBallY + (ballY - prevBallY) * alpha;
+
+    // Ghost (physics position)
+    ctx.beginPath();
+    ctx.arc(ballX, ballY, 12, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(192,160,96,0.2)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Interpolated (rendered position)
+    ctx.beginPath();
+    ctx.arc(drawX, drawY, 12, 0, Math.PI * 2);
+    ctx.fillStyle = '#c0a060';
+    ctx.fill();
+
+    ctx.restore();
+
+    // ── Right: accumulator diagram ──
+    const graphX = 440, graphY = 20, graphW = 380, graphH = 120;
+
+    ctx.strokeStyle = '#2a2820';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(graphX, graphY, graphW, graphH);
+
+    ctx.fillStyle = '#1a1916';
+    ctx.font = '12px Inter';
+    ctx.fillText('Accumulator Over Time', graphX, graphY - 4);
+
+    // Draw timestep threshold line
+    ctx.strokeStyle = 'rgba(192,160,96,0.3)';
+    ctx.setLineDash([4, 4]);
+    const threshY = graphY + graphH - (TIMESTEP / 50) * graphH;
+    ctx.beginPath();
+    ctx.moveTo(graphX, threshY);
+    ctx.lineTo(graphX + graphW, threshY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#706050';
+    ctx.font = '10px Inter';
+    ctx.fillText('16.67ms (1 update)', graphX + graphW + 4, threshY + 4);
+
+    // Plot accumulator history
+    if (history.length > 1) {
+      ctx.beginPath();
+      ctx.strokeStyle = '#4a8aaa';
+      ctx.lineWidth = 2;
+      for (let i = 0; i < history.length; i++) {
+        const px = graphX + (i / 120) * graphW;
+        const py = graphY + graphH - (history[i].accAfter / 50) * graphH;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      }
+      ctx.stroke();
+
+      // Update ticks
+      for (let i = 0; i < history.length; i++) {
+        if (history[i].updates > 0) {
+          const px = graphX + (i / 120) * graphW;
+          ctx.fillStyle = 'rgba(192,160,96,0.5)';
+          ctx.fillRect(px - 1, graphY + graphH - 4, 2, 4);
+        }
+      }
+    }
+
+    // ── Bottom: stats ──
+    const statsY = 170;
+    ctx.fillStyle = '#c0a060';
+    ctx.font = '14px MedievalSharp';
+    ctx.fillText(`FPS: ${displayFps}`, graphX, statsY);
+    ctx.fillText(`UPS: ${displayUps}`, graphX + 100, statsY);
+    ctx.fillText(`Speed: ${speed}x`, graphX + 200, statsY);
+    ctx.fillText(`Alpha: ${alpha.toFixed(3)}`, graphX + 300, statsY);
+
+    ctx.fillStyle = '#706050';
+    ctx.font = '12px Inter';
+    ctx.fillText(`Accumulator: ${accumulator.toFixed(2)}ms`, graphX, statsY + 24);
+    ctx.fillText(`Timestep: ${TIMESTEP.toFixed(2)}ms`, graphX + 180, statsY + 24);
+
+    // ── Bottom diagram: pipeline ──
+    const pipeY = 260;
+    const stages = [
+      { label: 'RAF fires', color: '#4a6a4a', w: 100 },
+      { label: 'Measure dt', color: '#4a5a6a', w: 100 },
+      { label: 'Accumulate', color: '#6a5a4a', w: 100 },
+      { label: `Update x${updates}`, color: '#8a6a4a', w: 100 },
+      { label: `Render (α=${alpha.toFixed(2)})`, color: '#4a6a8a', w: 160 },
+    ];
+
+    let px = graphX;
+    ctx.font = '11px Inter';
+    ctx.textAlign = 'center';
+    for (const s of stages) {
+      ctx.fillStyle = s.color;
+      ctx.fillRect(px, pipeY, s.w - 4, 36);
+      ctx.fillStyle = '#c0b090';
+      ctx.fillText(s.label, px + s.w / 2 - 2, pipeY + 22);
+      // Arrow
+      if (px > graphX) {
+        ctx.fillStyle = '#706050';
+        ctx.beginPath();
+        ctx.moveTo(px - 4, pipeY + 14);
+        ctx.lineTo(px, pipeY + 18);
+        ctx.lineTo(px - 4, pipeY + 22);
+        ctx.fill();
+      }
+      px += s.w;
+    }
+    ctx.textAlign = 'left';
+
+    // Labels
+    ctx.fillStyle = '#504840';
+    ctx.font = '10px Inter';
+    ctx.fillText('Each frame:', graphX, pipeY - 6);
+
+    // Interpolation explanation
+    ctx.fillStyle = '#504840';
+    ctx.font = '11px Inter';
+    ctx.fillText('Rendered position = prevPos + (currentPos - prevPos) × alpha', graphX, pipeY + 60);
+    ctx.fillText('This gives buttery-smooth visuals even when update rate ≠ display rate', graphX, pipeY + 76);
+
+    animId = requestAnimationFrame(tick);
+  }
+
+  document.getElementById('gl-speed1').addEventListener('click', () => { speed = 1; });
+  document.getElementById('gl-speed2').addEventListener('click', () => { speed = 2; });
+  document.getElementById('gl-pause').addEventListener('click', function() {
+    paused = !paused;
+    this.textContent = paused ? 'Resume' : 'Pause';
+  });
+  document.getElementById('gl-slow').addEventListener('click', function() {
+    simFps = simFps === 60 ? 30 : 60;
+    this.textContent = simFps === 60 ? 'Slow CPU (30fps)' : 'Normal (60fps)';
+  });
+
+  tick();
+  cleanupFns.gameloop = () => { if (animId) cancelAnimationFrame(animId); };
+};
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 4. STATE MACHINE
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+vizInits.statemachine = () => {
+  const el = document.getElementById('viz-statemachine');
+  el.innerHTML = `
+    <h2>Game State Machine</h2>
+    <p class="desc">Click the transition buttons to move between states. Invalid transitions are ignored.
+    The state machine guards all transitions — you can't pause from the menu or win after dying.</p>
+  `;
+
+  const W = 840, H = 380;
+  const [canvas, ctx] = makeCanvas(el, W, H);
+
+  el.innerHTML += `
+    <div class="controls" id="gsm-controls">
+      <button data-action="startGame">startGame()</button>
+      <button data-action="pause">pause()</button>
+      <button data-action="resume">resume()</button>
+      <button data-action="gameOver">gameOver()</button>
+      <button data-action="victory">victory()</button>
+      <button data-action="restart">restart()</button>
+    </div>
+  `;
+
+  const logEl = document.createElement('div');
+  logEl.className = 'info-box';
+  logEl.style.maxHeight = '120px';
+  logEl.style.overflowY = 'auto';
+  logEl.style.fontFamily = 'monospace';
+  el.appendChild(logEl);
+
+  const states = {
+    menu:      { x: 120, y: 190, color: '#4a6a4a', label: 'MENU' },
+    playing:   { x: 340, y: 190, color: '#4a8aaa', label: 'PLAYING' },
+    paused:    { x: 340, y: 60,  color: '#8a8a4a', label: 'PAUSED' },
+    game_over: { x: 580, y: 280, color: '#aa4a4a', label: 'GAME OVER' },
+    victory:   { x: 580, y: 100, color: '#c0a060', label: 'VICTORY' },
+  };
+
+  const transitions = [
+    { from: 'menu', to: 'playing', label: 'startGame()' },
+    { from: 'playing', to: 'paused', label: 'pause()' },
+    { from: 'paused', to: 'playing', label: 'resume()' },
+    { from: 'playing', to: 'game_over', label: 'gameOver()' },
+    { from: 'playing', to: 'victory', label: 'victory()' },
+    { from: 'game_over', to: 'menu', label: 'restart()' },
+    { from: 'victory', to: 'menu', label: 'restart()' },
+    { from: 'paused', to: 'game_over', label: 'gameOver()' },
+  ];
+
+  let currentState = 'menu';
+  let logs = ['> Initial state: MENU'];
+  let flashState = null, flashTimer = 0;
+  let animId = null;
+
+  function transition(action) {
+    const validMap = {
+      startGame: () => currentState === 'menu' ? 'playing' : null,
+      pause: () => currentState === 'playing' ? 'paused' : null,
+      resume: () => currentState === 'paused' ? 'playing' : null,
+      gameOver: () => (currentState === 'playing' || currentState === 'paused') ? 'game_over' : null,
+      victory: () => currentState === 'playing' ? 'victory' : null,
+      restart: () => 'menu',
+    };
+
+    const next = validMap[action]?.();
+    if (next) {
+      const prev = currentState;
+      currentState = next;
+      flashState = next;
+      flashTimer = 1;
+      logs.push(`> ${action}(): ${states[prev].label} → ${states[next].label}`);
+    } else {
+      logs.push(`> ${action}(): BLOCKED (invalid from ${states[currentState].label})`);
+    }
+    if (logs.length > 20) logs.shift();
+    logEl.innerHTML = logs.map(l => l.includes('BLOCKED')
+      ? `<div style="color:#aa4a4a">${l}</div>`
+      : `<div style="color:#706050">${l}</div>`
+    ).join('');
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function drawArrow(x1, y1, x2, y2, label, active) {
+    const dx = x2 - x1, dy = y2 - y1;
+    const len = Math.sqrt(dx * dx + dy * dy);
+    const ux = dx / len, uy = dy / len;
+    const sx = x1 + ux * 50, sy = y1 + uy * 50;
+    const ex = x2 - ux * 50, ey = y2 - uy * 50;
+
+    ctx.strokeStyle = active ? 'rgba(192,160,96,0.8)' : 'rgba(100,90,70,0.3)';
+    ctx.lineWidth = active ? 2.5 : 1;
+    ctx.beginPath();
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(ex, ey);
+    ctx.stroke();
+
+    // Arrowhead
+    const angle = Math.atan2(ey - sy, ex - sx);
+    ctx.fillStyle = ctx.strokeStyle;
+    ctx.beginPath();
+    ctx.moveTo(ex, ey);
+    ctx.lineTo(ex - 10 * Math.cos(angle - 0.3), ey - 10 * Math.sin(angle - 0.3));
+    ctx.lineTo(ex - 10 * Math.cos(angle + 0.3), ey - 10 * Math.sin(angle + 0.3));
+    ctx.fill();
+
+    // Label
+    const mx = (sx + ex) / 2, my = (sy + ey) / 2;
+    const perpX = -uy * 12, perpY = ux * 12;
+    ctx.fillStyle = active ? '#c0a060' : '#504840';
+    ctx.font = '10px Inter';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, mx + perpX, my + perpY);
+    ctx.textAlign = 'left';
+  }
+
+  function draw() {
+    ctx.fillStyle = '#12110e';
+    ctx.fillRect(0, 0, W, H);
+
+    if (flashTimer > 0) flashTimer -= 0.016;
+
+    // Draw transitions
+    for (const t of transitions) {
+      const from = states[t.from], to = states[t.to];
+      const active = t.from === currentState;
+      drawArrow(from.x, from.y, to.x, to.y, t.label, active);
+    }
+
+    // Draw states
+    for (const [id, s] of Object.entries(states)) {
+      const isCurrent = id === currentState;
+      const isFlash = id === flashState && flashTimer > 0;
+
+      ctx.beginPath();
+      ctx.arc(s.x, s.y, 42, 0, Math.PI * 2);
+      ctx.fillStyle = isCurrent ? s.color : '#1a1916';
+      ctx.fill();
+      ctx.strokeStyle = isCurrent ? s.color : '#3a3228';
+      ctx.lineWidth = isCurrent ? 3 : 1;
+      ctx.stroke();
+
+      if (isFlash) {
+        ctx.beginPath();
+        ctx.arc(s.x, s.y, 42 + flashTimer * 20, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(192,160,96,${flashTimer * 0.5})`;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+      }
+
+      ctx.fillStyle = isCurrent ? '#fff' : '#706050';
+      ctx.font = isCurrent ? 'bold 12px Inter' : '12px Inter';
+      ctx.textAlign = 'center';
+      ctx.fillText(s.label, s.x, s.y + 4);
+      ctx.textAlign = 'left';
+    }
+
+    animId = requestAnimationFrame(draw);
+  }
+
+  document.getElementById('gsm-controls').addEventListener('click', (e) => {
+    if (e.target.dataset.action) transition(e.target.dataset.action);
+  });
+
+  draw();
+  cleanupFns.statemachine = () => { if (animId) cancelAnimationFrame(animId); };
+};
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 5. EVENT BUS
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+vizInits.eventbus = () => {
+  const el = document.getElementById('viz-eventbus');
+  el.innerHTML = `
+    <h2>Event Bus (Pub/Sub)</h2>
+    <p class="desc">Systems never import each other directly. They publish events on a central bus, and other systems subscribe.
+    Click a publisher to fire an event and watch it propagate to subscribers.</p>
+  `;
+
+  const W = 840, H = 440;
+  const [canvas, ctx] = makeCanvas(el, W, H);
+
+  const infoEl = document.createElement('div');
+  infoEl.className = 'info-box';
+  infoEl.innerHTML = `
+    <strong>Why Event Bus?</strong> Full decoupling. <code>InputManager</code> doesn't know <code>CombatSystem</code> exists.
+    It just publishes <code>INPUT_CLICK</code>. Any system can subscribe without changing the publisher.
+    This makes systems independently testable and the architecture extensible.
+  `;
+  el.appendChild(infoEl);
+
+  const busX = 420, busY = 220;
+
+  const publishers = [
+    { label: 'InputManager', x: 80, y: 60, events: ['INPUT_CLICK', 'INPUT_KEY_DOWN'] },
+    { label: 'CombatSystem', x: 80, y: 170, events: ['ENTITY_DAMAGED', 'ENTITY_DIED'] },
+    { label: 'WaveManager', x: 80, y: 280, events: ['WAVE_STARTED', 'WAVE_COMPLETED'] },
+    { label: 'ResourceManager', x: 80, y: 390, events: ['RESOURCES_CHANGED'] },
+  ];
+
+  const subscribers = [
+    { label: 'main.js', x: 720, y: 50, listens: ['INPUT_CLICK', 'INPUT_KEY_DOWN', 'ENTITY_DIED', 'WAVE_STARTED', 'WAVE_COMPLETED', 'RESOURCES_CHANGED'] },
+    { label: 'HUD', x: 720, y: 140, listens: ['RESOURCES_CHANGED'] },
+    { label: 'EntityRenderer', x: 720, y: 230, listens: ['ENTITY_DAMAGED'] },
+    { label: 'Minimap', x: 720, y: 320, listens: ['INPUT_CLICK'] },
+    { label: 'Toolbar', x: 720, y: 410, listens: ['INPUT_KEY_DOWN'] },
+  ];
+
+  let particles = [];
+  let animId = null;
+
+  function fireEvent(eventName, startX, startY) {
+    const matchingSubs = subscribers.filter(s => s.listens.includes(eventName));
+    for (const sub of matchingSubs) {
+      particles.push({
+        x: startX, y: startY,
+        tx: busX, ty: busY,
+        fx: sub.x - 50, fy: sub.y,
+        phase: 0, // 0=to bus, 1=at bus, 2=to sub
+        t: 0,
+        event: eventName,
+        target: sub.label,
+      });
+    }
+  }
+
+  function draw() {
+    ctx.fillStyle = '#12110e';
+    ctx.fillRect(0, 0, W, H);
+
+    // Event Bus center
+    ctx.beginPath();
+    ctx.arc(busX, busY, 50, 0, Math.PI * 2);
+    ctx.fillStyle = '#1a2a1a';
+    ctx.fill();
+    ctx.strokeStyle = '#4a6a4a';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.fillStyle = '#6a8a6a';
+    ctx.font = '14px MedievalSharp';
+    ctx.textAlign = 'center';
+    ctx.fillText('EventBus', busX, busY - 4);
+    ctx.font = '10px Inter';
+    ctx.fillText('pub/sub', busX, busY + 12);
+
+    // Publishers
+    for (const p of publishers) {
+      ctx.fillStyle = '#1e2a1e';
+      ctx.fillRect(p.x - 55, p.y - 18, 110, 36);
+      ctx.strokeStyle = '#4a6a4a';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(p.x - 55, p.y - 18, 110, 36);
+      ctx.fillStyle = '#8aaa8a';
+      ctx.font = '11px Inter';
+      ctx.textAlign = 'center';
+      ctx.fillText(p.label, p.x, p.y + 4);
+
+      // Connection line
+      ctx.strokeStyle = '#2a3a2a';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(p.x + 55, p.y);
+      ctx.lineTo(busX - 50, busY);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Subscribers
+    for (const s of subscribers) {
+      ctx.fillStyle = '#1e1e2a';
+      ctx.fillRect(s.x - 50, s.y - 18, 100, 36);
+      ctx.strokeStyle = '#4a4a6a';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(s.x - 50, s.y - 18, 100, 36);
+      ctx.fillStyle = '#8a8aaa';
+      ctx.font = '11px Inter';
+      ctx.textAlign = 'center';
+      ctx.fillText(s.label, s.x, s.y + 4);
+
+      // Connection line
+      ctx.strokeStyle = '#2a2a3a';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([3, 3]);
+      ctx.beginPath();
+      ctx.moveTo(busX + 50, busY);
+      ctx.lineTo(s.x - 50, s.y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    ctx.textAlign = 'left';
+
+    // Labels
+    ctx.fillStyle = '#504840';
+    ctx.font = '11px Inter';
+    ctx.fillText('Publishers', 55, 28);
+    ctx.fillText('Subscribers', 680, 28);
+    ctx.fillText('← Click a publisher to fire an event →', busX - 100, busY + 80);
+
+    // Animate particles
+    for (let i = particles.length - 1; i >= 0; i--) {
+      const p = particles[i];
+      p.t += 0.025;
+
+      let px, py;
+      if (p.t < 0.5) {
+        // Phase 0: to bus
+        const tt = p.t / 0.5;
+        px = p.x + (p.tx - p.x) * tt;
+        py = p.y + (p.ty - p.y) * tt;
+      } else if (p.t < 1.0) {
+        // Phase 1: bus to subscriber
+        const tt = (p.t - 0.5) / 0.5;
+        px = p.tx + (p.fx - p.tx) * tt;
+        py = p.ty + (p.fy - p.ty) * tt;
+      } else {
+        // Flash at target
+        const sub = subscribers.find(s => s.label === p.target);
+        if (sub) {
+          ctx.fillStyle = `rgba(192,160,96,${Math.max(0, 1.3 - p.t) * 0.4})`;
+          ctx.fillRect(sub.x - 50, sub.y - 18, 100, 36);
+        }
+        if (p.t > 1.5) { particles.splice(i, 1); continue; }
+        continue;
+      }
+
+      // Draw particle
+      ctx.beginPath();
+      ctx.arc(px, py, 5, 0, Math.PI * 2);
+      ctx.fillStyle = '#c0a060';
+      ctx.fill();
+      ctx.fillStyle = '#c0a060';
+      ctx.font = '9px Inter';
+      ctx.textAlign = 'center';
+      ctx.fillText(p.event, px, py - 10);
+      ctx.textAlign = 'left';
+    }
+
+    animId = requestAnimationFrame(draw);
+  }
+
+  canvas.addEventListener('click', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left, my = e.clientY - rect.top;
+    for (const p of publishers) {
+      if (mx >= p.x - 55 && mx <= p.x + 55 && my >= p.y - 18 && my <= p.y + 18) {
+        const evt = p.events[Math.floor(Math.random() * p.events.length)];
+        fireEvent(evt, p.x + 55, p.y);
+        break;
+      }
+    }
+  });
+
+  draw();
+  cleanupFns.eventbus = () => { if (animId) cancelAnimationFrame(animId); };
+};
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 6. CREATURE AI
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+vizInits.creatureai = () => {
+  const el = document.getElementById('viz-creatureai');
+  el.innerHTML = `
+    <h2>Creature AI — Priority State Machine</h2>
+    <p class="desc">Player creatures use a priority-based decision tree. Higher priority needs override lower ones.
+    Adjust the sliders to see which state the creature enters.</p>
+  `;
+
+  const W = 840, H = 420;
+  const [canvas, ctx] = makeCanvas(el, W, H);
+
+  el.innerHTML += `
+    <div style="display:flex;gap:24px;flex-wrap:wrap;margin-bottom:12px;">
+      <label style="color:#a09070;font-size:13px;">Health: <input type="range" id="ai-health" min="0" max="100" value="80"> <span id="ai-health-val">80</span>%</label>
+      <label style="color:#a09070;font-size:13px;">Hunger: <input type="range" id="ai-hunger" min="0" max="100" value="50"> <span id="ai-hunger-val">50</span></label>
+      <label style="color:#a09070;font-size:13px;">Energy: <input type="range" id="ai-energy" min="0" max="100" value="70"> <span id="ai-energy-val">70</span></label>
+      <label style="color:#a09070;font-size:13px;"><input type="checkbox" id="ai-enemy"> Enemy Nearby</label>
+      <label style="color:#a09070;font-size:13px;"><input type="checkbox" id="ai-training"> Training Room</label>
+    </div>
+  `;
+
+  const infoEl = document.createElement('div');
+  infoEl.className = 'info-box';
+  infoEl.innerHTML = `
+    <strong>Priority hierarchy:</strong> The creature checks conditions top-to-bottom. The first matching condition wins.<br>
+    1. <code>FLEE</code> if health &lt; 20% (survival instinct)<br>
+    2. <code>EAT</code> if hunger &lt; 30 (basic need)<br>
+    3. <code>SLEEP</code> if energy &lt; 20 (basic need)<br>
+    4. <code>ATTACK</code> if enemy nearby (reactive goal)<br>
+    5. <code>TRAIN</code> if training room available (proactive goal)<br>
+    6. <code>IDLE</code> — wander randomly (default)
+  `;
+  el.appendChild(infoEl);
+
+  let animId = null;
+
+  function getState() {
+    const health = +document.getElementById('ai-health').value;
+    const hunger = +document.getElementById('ai-hunger').value;
+    const energy = +document.getElementById('ai-energy').value;
+    const enemy = document.getElementById('ai-enemy').checked;
+    const training = document.getElementById('ai-training').checked;
+
+    if (health < 20) return 'FLEE';
+    if (hunger < 30) return 'EAT';
+    if (energy < 20) return 'SLEEP';
+    if (enemy) return 'ATTACK';
+    if (training) return 'TRAIN';
+    return 'IDLE';
+  }
+
+  const stateInfo = {
+    FLEE:   { color: '#aa3030', desc: 'Run toward Dungeon Heart', icon: '!' },
+    EAT:    { color: '#4a8a4a', desc: 'Pathfind to nearest Hatchery', icon: 'E' },
+    SLEEP:  { color: '#4a4a8a', desc: 'Pathfind to nearest Lair', icon: 'Z' },
+    ATTACK: { color: '#aa6a30', desc: 'Engage nearest enemy', icon: 'X' },
+    TRAIN:  { color: '#8a8a4a', desc: 'Walk to Training Room, gain XP', icon: 'T' },
+    IDLE:   { color: '#5a5a5a', desc: 'Wander randomly on claimed floor', icon: '~' },
+  };
+
+  const priorities = ['FLEE', 'EAT', 'SLEEP', 'ATTACK', 'TRAIN', 'IDLE'];
+  const conditions = [
+    'health < 20%',
+    'hunger < 30',
+    'energy < 20',
+    'enemy nearby',
+    'training room',
+    'always (default)',
+  ];
+
+  function draw() {
+    const activeState = getState();
+
+    document.getElementById('ai-health-val').textContent = document.getElementById('ai-health').value;
+    document.getElementById('ai-hunger-val').textContent = document.getElementById('ai-hunger').value;
+    document.getElementById('ai-energy-val').textContent = document.getElementById('ai-energy').value;
+
+    ctx.fillStyle = '#12110e';
+    ctx.fillRect(0, 0, W, H);
+
+    const startX = 40, startY = 30, rowH = 60, boxW = 200;
+
+    // Title
+    ctx.fillStyle = '#504840';
+    ctx.font = '12px Inter';
+    ctx.fillText('Priority', startX, startY - 6);
+    ctx.fillText('Condition', startX + 60, startY - 6);
+    ctx.fillText('State', startX + 260, startY - 6);
+    ctx.fillText('Action', startX + 440, startY - 6);
+
+    let foundActive = false;
+
+    for (let i = 0; i < priorities.length; i++) {
+      const p = priorities[i];
+      const info = stateInfo[p];
+      const y = startY + i * rowH + 12;
+      const isActive = p === activeState && !foundActive;
+      if (isActive) foundActive = true;
+      const isSkipped = foundActive && !isActive;
+
+      // Priority number
+      ctx.fillStyle = isActive ? '#c0a060' : '#504840';
+      ctx.font = isActive ? 'bold 16px MedievalSharp' : '16px MedievalSharp';
+      ctx.fillText(`${i + 1}.`, startX, y + 18);
+
+      // Condition
+      const health = +document.getElementById('ai-health').value;
+      const hunger = +document.getElementById('ai-hunger').value;
+      const energy = +document.getElementById('ai-energy').value;
+      const enemy = document.getElementById('ai-enemy').checked;
+      const training = document.getElementById('ai-training').checked;
+      const condMet = [health < 20, hunger < 30, energy < 20, enemy, training, true][i];
+
+      ctx.fillStyle = condMet && !isSkipped ? (isActive ? '#c0a060' : '#8a7a5a') : '#3a3228';
+      ctx.font = '12px Inter';
+      ctx.fillText(conditions[i], startX + 60, y + 16);
+      ctx.fillText(condMet ? '✓' : '✗', startX + 220, y + 16);
+
+      // State box
+      const boxX = startX + 260;
+      ctx.fillStyle = isActive ? info.color : '#1a1916';
+      ctx.fillRect(boxX, y, 150, 32);
+      ctx.strokeStyle = isActive ? info.color : '#2a2820';
+      ctx.lineWidth = isActive ? 2 : 1;
+      ctx.strokeRect(boxX, y, 150, 32);
+
+      ctx.fillStyle = isActive ? '#fff' : '#504840';
+      ctx.font = isActive ? 'bold 14px MedievalSharp' : '14px MedievalSharp';
+      ctx.textAlign = 'center';
+      ctx.fillText(`${info.icon}  ${p}`, boxX + 75, y + 20);
+      ctx.textAlign = 'left';
+
+      // Action
+      ctx.fillStyle = isActive ? '#c0b090' : '#3a3228';
+      ctx.font = '11px Inter';
+      ctx.fillText(info.desc, startX + 440, y + 16);
+
+      // Arrow from condition to state (if active)
+      if (isActive) {
+        ctx.strokeStyle = '#c0a060';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(startX + 240, y + 16);
+        ctx.lineTo(boxX - 4, y + 16);
+        ctx.stroke();
+        ctx.fillStyle = '#c0a060';
+        ctx.beginPath();
+        ctx.moveTo(boxX, y + 16);
+        ctx.lineTo(boxX - 8, y + 12);
+        ctx.lineTo(boxX - 8, y + 20);
+        ctx.fill();
+      }
+    }
+
+    animId = requestAnimationFrame(draw);
+  }
+
+  ['ai-health', 'ai-hunger', 'ai-energy', 'ai-enemy', 'ai-training'].forEach(id => {
+    document.getElementById(id).addEventListener('input', () => {});
+  });
+
+  draw();
+  cleanupFns.creatureai = () => { if (animId) cancelAnimationFrame(animId); };
+};
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 7. PARTICLE POOL
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+vizInits.particles = () => {
+  const el = document.getElementById('viz-particles');
+  el.innerHTML = `
+    <h2>Object Pool & Particle System</h2>
+    <p class="desc">Click anywhere to spawn a particle burst. Particles are pre-allocated — no <code>new</code> calls during gameplay.
+    Watch the pool stats: active particles come from the free pool, return when their lifetime expires.</p>
+    <div class="legend">
+      <span><span class="swatch" style="background:#c0a060"></span> Active particle</span>
+      <span><span class="swatch" style="background:#2a4a2a"></span> Free in pool</span>
+    </div>
+  `;
+
+  const W = 840, H = 400;
+  const [canvas, ctx] = makeCanvas(el, W, H);
+  const statEl = document.createElement('div');
+  statEl.className = 'stat-line';
+  el.appendChild(statEl);
+
+  const infoEl = document.createElement('div');
+  infoEl.className = 'info-box';
+  infoEl.innerHTML = `
+    <strong>Object Pool pattern:</strong> Pre-allocate 512 particle objects at startup. <code>acquire()</code> pops from the free list.
+    <code>release()</code> pushes back with a reset. Result: <strong>zero garbage collection</strong> during gameplay.
+    Each particle has position, velocity, gravity, lifetime, size, and color. Rendered with alpha fade based on remaining life.
+  `;
+  el.appendChild(infoEl);
+
+  const POOL_SIZE = 512;
+  const pool = [];
+  const active = [];
+
+  for (let i = 0; i < POOL_SIZE; i++) {
+    pool.push({ x: 0, y: 0, vx: 0, vy: 0, life: 0, maxLife: 0, size: 0, color: '', gravity: 0 });
+  }
+
+  let allocCount = 0;
+  let animId = null;
+
+  function burst(x, y, color, count) {
+    for (let i = 0; i < count; i++) {
+      if (pool.length === 0) break;
+      const p = pool.pop();
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 40 + Math.random() * 100;
+      p.x = x; p.y = y;
+      p.vx = Math.cos(angle) * speed;
+      p.vy = Math.sin(angle) * speed;
+      p.life = 0.5 + Math.random() * 0.8;
+      p.maxLife = p.life;
+      p.size = 2 + Math.random() * 4;
+      p.color = color;
+      p.gravity = 120;
+      active.push(p);
+      allocCount++;
+    }
+  }
+
+  function draw() {
+    const dt = 1 / 60;
+
+    ctx.fillStyle = '#12110e';
+    ctx.fillRect(0, 0, W, H);
+
+    // Update and render particles
+    for (let i = active.length - 1; i >= 0; i--) {
+      const p = active[i];
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+      p.vy += p.gravity * dt;
+      p.life -= dt;
+
+      if (p.life <= 0) {
+        active.splice(i, 1);
+        pool.push(p);
+        continue;
+      }
+
+      const alpha = p.life / p.maxLife;
+      ctx.globalAlpha = alpha;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size * alpha, 0, Math.PI * 2);
+      ctx.fillStyle = p.color;
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // Pool visualization (right side)
+    const poolX = 640, poolY = 20;
+    ctx.fillStyle = '#1a1916';
+    ctx.fillRect(poolX, poolY, 190, 200);
+    ctx.strokeStyle = '#2a2820';
+    ctx.strokeRect(poolX, poolY, 190, 200);
+
+    ctx.fillStyle = '#706050';
+    ctx.font = '12px MedievalSharp';
+    ctx.fillText('Object Pool', poolX + 60, poolY + 18);
+
+    const cols = 18, cellS = 8, pad = 12;
+    for (let i = 0; i < POOL_SIZE; i++) {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const cx = poolX + pad + col * (cellS + 2);
+      const cy = poolY + 28 + row * (cellS + 2);
+      const isActive = i < active.length;
+      ctx.fillStyle = isActive ? '#c0a060' : '#1a2a1a';
+      ctx.fillRect(cx, cy, cellS, cellS);
+    }
+
+    ctx.fillStyle = '#706050';
+    ctx.font = '11px Inter';
+    ctx.fillText('Click canvas to spawn burst!', 30, H - 16);
+
+    statEl.innerHTML = `Active: <strong>${active.length}</strong> | Free: <strong>${pool.length}</strong> / ${POOL_SIZE} | Total acquires: <strong>${allocCount}</strong> | Heap allocations: <strong>0</strong>`;
+
+    animId = requestAnimationFrame(draw);
+  }
+
+  canvas.addEventListener('click', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const colors = ['#c0a060', '#ff6040', '#60c0ff', '#80ff80', '#ff80ff', '#ffffff'];
+    burst(e.clientX - rect.left, e.clientY - rect.top, colors[Math.floor(Math.random() * colors.length)], 25);
+  });
+
+  // Auto-burst for demo
+  burst(200, 200, '#c0a060', 15);
+  burst(400, 150, '#ff6040', 15);
+
+  draw();
+  cleanupFns.particles = () => { if (animId) cancelAnimationFrame(animId); };
+};
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// 8. COMBAT TICK
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+vizInits.combat = () => {
+  const el = document.getElementById('viz-combat');
+  el.innerHTML = `
+    <h2>Tick-Based Combat System</h2>
+    <p class="desc">Combat resolves on a separate tick (every 100ms). Each tick: update debuffs, check cooldowns,
+    find nearest enemies in range, deal damage, apply effects. Watch a simulated battle unfold.</p>
+    <div class="controls">
+      <button id="combat-start">Start Battle</button>
+      <button id="combat-reset">Reset</button>
+    </div>
+  `;
+
+  const W = 840, H = 420;
+  const [canvas, ctx] = makeCanvas(el, W, H);
+  const logEl = document.createElement('div');
+  logEl.className = 'info-box';
+  logEl.style.maxHeight = '140px';
+  logEl.style.overflowY = 'auto';
+  logEl.style.fontFamily = 'monospace';
+  logEl.style.fontSize = '11px';
+  el.appendChild(logEl);
+
+  let entities = [];
+  let logs = [];
+  let animId = null;
+  let combatAcc = 0;
+  let running = false;
+  let tick = 0;
+
+  function reset() {
+    entities = [
+      { name: 'Troll',     team: 'player', hp: 120, maxHp: 120, dmg: 15, range: 40, cd: 0, maxCd: 1, x: 200, y: 210, color: '#4a8a4a', dead: false },
+      { name: 'Mistress',  team: 'player', hp: 80,  maxHp: 80,  dmg: 10, range: 50, cd: 0, maxCd: 0.6, x: 160, y: 150, color: '#8a4a8a', dead: false },
+      { name: 'Imp',       team: 'player', hp: 40,  maxHp: 40,  dmg: 3,  range: 30, cd: 0, maxCd: 0.8, x: 180, y: 270, color: '#6a6a4a', dead: false },
+      { name: 'Knight',    team: 'enemy',  hp: 150, maxHp: 150, dmg: 12, range: 40, cd: 0, maxCd: 1.2, x: 600, y: 180, color: '#6a6aaa', dead: false },
+      { name: 'Thief',     team: 'enemy',  hp: 60,  maxHp: 60,  dmg: 8,  range: 35, cd: 0, maxCd: 0.5, x: 640, y: 260, color: '#4a4a6a', dead: false },
+      { name: 'Wizard',    team: 'enemy',  hp: 80,  maxHp: 80,  dmg: 14, range: 100,cd: 0, maxCd: 1.5, x: 680, y: 120, color: '#4a6aaa', dead: false },
+    ];
+    logs = ['Combat system ready. Click "Start Battle" to begin.'];
+    tick = 0;
+    combatAcc = 0;
+    running = false;
+    updateLog();
+  }
+
+  function updateLog() {
+    logEl.innerHTML = logs.map(l => {
+      if (l.includes('KILLED')) return `<div style="color:#aa4040">${l}</div>`;
+      if (l.includes('dmg')) return `<div style="color:#c0a060">${l}</div>`;
+      if (l.includes('Tick')) return `<div style="color:#4a8aaa">${l}</div>`;
+      return `<div style="color:#706050">${l}</div>`;
+    }).join('');
+    logEl.scrollTop = logEl.scrollHeight;
+  }
+
+  function combatTick() {
+    tick++;
+    logs.push(`── Tick ${tick} ──`);
+
+    const alive = entities.filter(e => !e.dead);
+
+    for (const attacker of alive) {
+      attacker.cd -= 0.1;
+      if (attacker.cd > 0) continue;
+
+      // Find nearest enemy
+      let nearest = null, nearDist = Infinity;
+      for (const target of alive) {
+        if (target.team === attacker.team) continue;
+        const dx = target.x - attacker.x, dy = target.y - attacker.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < nearDist && dist <= attacker.range * 3) {
+          nearDist = dist;
+          nearest = target;
+        }
+      }
+
+      if (!nearest) continue;
+
+      // Move toward if out of range
+      if (nearDist > attacker.range) {
+        const dx = nearest.x - attacker.x, dy = nearest.y - attacker.y;
+        const d = Math.sqrt(dx * dx + dy * dy);
+        attacker.x += (dx / d) * 15;
+        attacker.y += (dy / d) * 15;
+        continue;
+      }
+
+      // Attack
+      attacker.cd = attacker.maxCd;
+      nearest.hp -= attacker.dmg;
+      logs.push(`  ${attacker.name} → ${nearest.name}: ${attacker.dmg} dmg (${Math.max(0, nearest.hp)}hp left)`);
+
+      if (nearest.hp <= 0) {
+        nearest.dead = true;
+        logs.push(`  ☠ ${nearest.name} KILLED by ${attacker.name}!`);
+      }
+    }
+
+    if (logs.length > 50) logs = logs.slice(-40);
+    updateLog();
+
+    // Check if battle over
+    const playerAlive = entities.filter(e => e.team === 'player' && !e.dead);
+    const enemyAlive = entities.filter(e => e.team === 'enemy' && !e.dead);
+    if (playerAlive.length === 0 || enemyAlive.length === 0) {
+      running = false;
+      logs.push(playerAlive.length > 0 ? '=== PLAYER WINS ===' : '=== ENEMY WINS ===');
+      updateLog();
+    }
+  }
+
+  function draw() {
+    if (running) {
+      combatAcc += 1 / 60;
+      if (combatAcc >= 0.3) {
+        combatTick();
+        combatAcc = 0;
+      }
+    }
+
+    ctx.fillStyle = '#12110e';
+    ctx.fillRect(0, 0, W, H);
+
+    // Divider
+    ctx.strokeStyle = '#2a2820';
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(W / 2, 0);
+    ctx.lineTo(W / 2, H);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = '#2a3a2a';
+    ctx.font = '12px Inter';
+    ctx.fillText('Player Team', 20, 20);
+    ctx.fillStyle = '#2a2a3a';
+    ctx.fillText('Enemy Team', W - 110, 20);
+
+    // Draw entities
+    for (const e of entities) {
+      if (e.dead) {
+        ctx.fillStyle = '#2a2020';
+        ctx.font = '10px Inter';
+        ctx.textAlign = 'center';
+        ctx.fillText('☠ ' + e.name, e.x, e.y);
+        ctx.textAlign = 'left';
+        continue;
+      }
+
+      // Body
+      ctx.beginPath();
+      ctx.arc(e.x, e.y, 18, 0, Math.PI * 2);
+      ctx.fillStyle = e.color;
+      ctx.fill();
+      ctx.strokeStyle = e.team === 'player' ? '#4a8a4a' : '#6a4a4a';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+
+      // Name
+      ctx.fillStyle = '#c0b090';
+      ctx.font = '11px MedievalSharp';
+      ctx.textAlign = 'center';
+      ctx.fillText(e.name, e.x, e.y + 4);
+
+      // HP bar
+      const barW = 40, barH = 5;
+      const hpPct = Math.max(0, e.hp / e.maxHp);
+      ctx.fillStyle = '#1a1a1a';
+      ctx.fillRect(e.x - barW / 2, e.y - 28, barW, barH);
+      ctx.fillStyle = hpPct > 0.5 ? '#4a8a4a' : hpPct > 0.2 ? '#8a8a4a' : '#aa4a4a';
+      ctx.fillRect(e.x - barW / 2, e.y - 28, barW * hpPct, barH);
+
+      // HP text
+      ctx.fillStyle = '#807060';
+      ctx.font = '9px Inter';
+      ctx.fillText(`${Math.max(0, e.hp)}/${e.maxHp}`, e.x, e.y - 32);
+
+      // Attack range circle
+      if (running) {
+        ctx.beginPath();
+        ctx.arc(e.x, e.y, e.range, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(${e.team === 'player' ? '80,140,80' : '140,80,80'},0.15)`;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+
+      ctx.textAlign = 'left';
+    }
+
+    // Tick counter
+    ctx.fillStyle = '#504840';
+    ctx.font = '12px Inter';
+    ctx.fillText(`Combat tick: ${tick} | Interval: 100ms`, 20, H - 16);
+
+    animId = requestAnimationFrame(draw);
+  }
+
+  document.getElementById('combat-start').addEventListener('click', () => {
+    if (!running) {
+      running = true;
+      logs.push('Battle started!');
+      updateLog();
+    }
+  });
+
+  document.getElementById('combat-reset').addEventListener('click', reset);
+
+  reset();
+  draw();
+  cleanupFns.combat = () => { if (animId) cancelAnimationFrame(animId); };
+};
+
+// ─── Start on first tab ──────────────────────────────
+switchTab('astar');
+
+</script>
+</body>
+</html>

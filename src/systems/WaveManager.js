@@ -18,7 +18,8 @@ export class WaveManager {
   get countdown() { return Math.ceil(this._timer); }
 
   update(dt) {
-    this._timer -= dt;
+    // TEMP: sandbox mode — no enemy waves
+    return;
 
     if (this._activeHeroes.size > 0) {
       for (const heroId of this._activeHeroes) {
